@@ -1,8 +1,26 @@
 {
-  "isin": "QS0009080175",
-  "value": 39.44,
-  "currency": "EUR",
-  "date": "2026-06-18",
-  "source": "page_text (Valeur Liquidative C)",
-  "status": "ok"
+  "QS0009080175": {
+    "isin": "QS0009080175",
+    "label": "Amundi Actions Internationales ESR - F",
+    "value": 39.44,
+    "currency": "EUR",
+    "date": "2026-06-18",
+    "status": "ok"
+  },
+  "QS0009080746": {
+    "isin": "QS0009080746",
+    "label": "Amundi Label Equilibre ESR - F",
+    "value": 328.68,
+    "currency": "EUR",
+    "date": "2026-06-18",
+    "status": "ok"
+  },
+  "QS0009080720": {
+    "isin": "QS0009080720",
+    "label": "Amundi Label Monetaire ESR - F",
+    "value": 1308.8249,
+    "currency": "EUR",
+    "date": "2026-06-19",
+    "status": "ok"
+  }
 }
