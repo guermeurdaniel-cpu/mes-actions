@@ -8,22 +8,23 @@
 <title>Mes valeurs</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin:0; font-family:-apple-system,sans-serif; background:#0c0c0e; color:#fff; min-height:100vh; padding:env(safe-area-inset-top) 16px 24px; }
-  h1 { font-size:17px; color:#8e8e93; text-align:center; margin:16px 0 4px; }
-  .section { font-size:13px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:22px 4px 0; }
-  .card { background:#1c1c1e; border-radius:18px; padding:20px; margin-top:12px; }
-  .total-card { background:#0a84ff; border-radius:18px; padding:20px; margin-top:12px; }
-  .total-card .lbl { font-size:14px; color:#cfe5ff; }
-  .total-card .amount { font-size:34px; font-weight:800; margin-top:4px; }
-  .name { font-size:15px; color:#8e8e93; }
-  .price { font-size:32px; font-weight:700; margin:4px 0; }
-  .change { font-size:16px; font-weight:600; }
-  .held { font-size:15px; font-weight:600; color:#0a84ff; margin-top:10px; }
+  body { margin:0; font-family:-apple-system,sans-serif; background:#0c0c0e; color:#fff; min-height:100vh; padding:env(safe-area-inset-top) 12px 16px; }
+  h1 { font-size:15px; color:#8e8e93; text-align:center; margin:10px 0 2px; }
+  .section { font-size:11px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:14px 4px 2px; }
+  .total-card { background:#0a84ff; border-radius:14px; padding:12px 16px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; }
+  .total-card .lbl { font-size:13px; color:#cfe5ff; }
+  .total-card .amount { font-size:22px; font-weight:800; }
+  .row { background:#1c1c1e; border-radius:12px; padding:10px 12px; margin-top:7px; display:grid; grid-template-columns:1fr 96px; grid-gap:8px; align-items:center; }
+  .row .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .row .nm { font-size:13px; font-weight:600; color:#e5e5ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .pr { font-size:15px; font-weight:700; margin-left:8px; white-space:nowrap; }
+  .row .sub { font-size:11px; color:#8e8e93; margin-top:3px; display:flex; gap:8px; flex-wrap:wrap; }
+  .spark { width:96px; height:38px; display:block; grid-row:1 / span 2; align-self:center; }
   .up { color:#30d158; } .down { color:#ff453a; }
-  .meta { font-size:12px; color:#636366; margin-top:8px; }
-  .spark { margin-top:14px; width:100%; height:60px; display:block; }
-  .scale-note { font-size:11px; color:#636366; margin:8px 4px 0; }
-  .refresh { display:block; margin:24px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:12px; padding:10px 18px; font-size:15px; font-weight:600; }
+  .held { color:#0a84ff; font-weight:600; }
+  .err { font-size:11px; color:#ff453a; }
+  .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
+  .refresh { display:block; margin:16px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:10px; padding:8px 16px; font-size:14px; font-weight:600; }
 </style>
 </head>
 <body>
@@ -54,7 +55,7 @@ const QUANTITES = {
 
 const TICKERS = [
   { symbol:"AIR.PA",  label:"Airbus" },
-  { symbol:"WPEA.PA", label:"ETF MSCI World (WPEA)" }
+  { symbol:"WPEA.PA", label:"ETF MSCI World" }
 ];
 
 let totals = {};
@@ -68,28 +69,26 @@ function heldMontant(key, unitPrice){
   totals[key] = montant;
   return { qty:qty, montant:montant };
 }
-function heldLine(h){
+function heldTxt(h){
   if(h.qty <= 0) return "";
-  return '<div class="held">Detenu : '+formatEur(h.montant)+' ('+h.qty+' parts)</div>';
+  return '<span class="held">'+formatEur(h.montant)+'</span>';
 }
 function renderTotal(){
   let sum = 0;
   for(const k in totals){ if(isFinite(totals[k])) sum += totals[k]; }
   document.getElementById("total").innerHTML =
-    '<div class="total-card"><div class="lbl">Total du portefeuille</div>'
-    + '<div class="amount">'+formatEur(sum)+'</div></div>';
+    '<div class="total-card"><span class="lbl">Total portefeuille</span>'
+    + '<span class="amount">'+formatEur(sum)+'</span></div>';
 }
 
-// --- base 100 d'une serie ---
 function toBase100(values){
   if(!values || values.length < 2 || !values[0]) return null;
   return values.map(function(v){ return v/values[0]*100; });
 }
 
-// --- courbe avec echelle imposee (min/max communs) ---
 function sparkline(values100, gmin, gmax, up){
-  if(!values100 || values100.length < 2) return "";
-  const w=300, h=60, pad=5;
+  if(!values100 || values100.length < 2) return '<svg class="spark"></svg>';
+  const w=96, h=38, pad=3;
   const range = (gmax-gmin) || 1;
   const yOf = function(v){ return h-pad - (v-gmin)/range*(h-2*pad); };
   const pts = values100.map(function(v,i){
@@ -100,7 +99,7 @@ function sparkline(values100, gmin, gmax, up){
   let baseline = "";
   if(gmin <= 100 && gmax >= 100){
     const y100 = yOf(100).toFixed(1);
-    baseline = '<line x1="'+pad+'" y1="'+y100+'" x2="'+(w-pad)+'" y2="'+y100+'" stroke="#48484a" stroke-width="1" stroke-dasharray="3,3"/>';
+    baseline = '<line x1="'+pad+'" y1="'+y100+'" x2="'+(w-pad)+'" y2="'+y100+'" stroke="#48484a" stroke-width="1" stroke-dasharray="2,2"/>';
   }
   return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+baseline+'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+pts+'"/></svg>';
 }
@@ -130,15 +129,19 @@ async function fetchYahoo(symbol){
   return { price:price, prevClose:prevClose, currency:m.currency, time:new Date(m.regularMarketTime*1000), closes:closes };
 }
 
+function pctSpan(pct, label){
+  if(pct==null || !isFinite(pct)) return "";
+  return '<span class="'+(pct>=0?'up':'down')+'">'+label+(pct>=0?'+':'')+pct.toFixed(2)+'%</span>';
+}
+
 async function loadAll(){
   totals = {};
-  document.getElementById("cards").innerHTML = '<div class="card"><div class="meta">Chargement...</div></div>';
+  document.getElementById("cards").innerHTML = '<div class="row"><div class="sub">Chargement...</div></div>';
   document.getElementById("amundi").innerHTML = "";
   document.getElementById("scaleNote").innerHTML = "";
 
-  const items = []; // { container, html-builder data, series100 }
+  const items = [];
 
-  // 1) Valeurs cotees
   for(const t of TICKERS){
     try{
       const q = await fetchYahoo(t.symbol);
@@ -148,7 +151,6 @@ async function loadAll(){
     }
   }
 
-  // 2) Fonds Amundi
   try{
     const navR = await fetch("nav.json?t=" + Date.now());
     let histR = null;
@@ -164,66 +166,58 @@ async function loadAll(){
     items.push({ kind:"amundi-error", err:e.message });
   }
 
-  // 3) Echelle commune (base 100) sur toutes les series exploitables
   let gmin = Infinity, gmax = -Infinity;
   items.forEach(function(it){
-    if(it.series100){
-      it.series100.forEach(function(v){ if(v<gmin) gmin=v; if(v>gmax) gmax=v; });
-    }
+    if(it.series100){ it.series100.forEach(function(v){ if(v<gmin) gmin=v; if(v>gmax) gmax=v; }); }
   });
   if(!isFinite(gmin) || !isFinite(gmax) || gmin===gmax){ gmin=95; gmax=105; }
 
-  // 4) Rendu
   const cBox = document.getElementById("cards"); cBox.innerHTML="";
   const aBox = document.getElementById("amundi"); aBox.innerHTML="";
 
   items.forEach(function(it){
-    const card = document.createElement("div"); card.className="card";
+    const row = document.createElement("div"); row.className="row";
     if(it.kind==="yahoo"){
       const q=it.q, t=it.t;
       const diff=q.price-q.prevClose, pct=(diff/q.prevClose)*100;
-      const okDay=isFinite(diff)&&isFinite(pct);
-      const sign=diff>=0?"+":""; const cls=diff>=0?"up":"down";
-      const dayTxt=okDay?'<div class="change '+cls+'">'+sign+diff.toFixed(2)+' ('+sign+pct.toFixed(2)+'%)</div>':"";
+      const dayPct = isFinite(pct)?pct:null;
       const moPct=variation(q.closes);
-      const moTxt=(moPct==null)?"":'<div class="meta">1 mois : <span class="'+(moPct>=0?'up':'down')+'">'+(moPct>=0?'+':'')+moPct.toFixed(2)+'%</span></div>';
       const up=((moPct==null?0:moPct)>=0);
       const h=heldMontant(t.symbol,q.price);
-      card.innerHTML='<div class="name">'+t.label+' &middot; '+t.symbol+'</div>'
-        +'<div class="price">'+q.price.toFixed(2)+' '+q.currency+'</div>'
-        +dayTxt+sparkline(it.series100,gmin,gmax,up)+moTxt+heldLine(h)
-        +'<div class="meta">Mis a jour : '+q.time.toLocaleTimeString("fr-FR")+'</div>';
-      cBox.appendChild(card);
+      row.innerHTML =
+        '<div><div class="top"><span class="nm">'+t.label+'</span><span class="pr">'+q.price.toFixed(2)+'</span></div>'
+        +'<div class="sub">'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt(h)+'</div></div>'
+        + sparkline(it.series100,gmin,gmax,up);
+      cBox.appendChild(row);
     } else if(it.kind==="yahoo-error"){
-      card.innerHTML='<div class="name">'+it.t.label+'</div><div class="meta">Erreur : '+it.err+'</div>';
-      cBox.appendChild(card);
+      row.innerHTML='<div><div class="nm">'+it.t.label+'</div><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
+      cBox.appendChild(row);
     } else if(it.kind==="amundi"){
       const f=it.f;
       if(f.status==="ok" && f.value!=null){
-        const dateFr=f.date.split("-").reverse().join("/");
         const moPct=variation(it.series);
         const lc=lastChange(it.series);
-        const dayTxt=lc?'<div class="change '+(lc.diff>=0?'up':'down')+'">'+(lc.diff>=0?'+':'')+lc.diff.toFixed(2)+' ('+(lc.diff>=0?'+':'')+lc.pct.toFixed(2)+'%)</div>':"";
-        const moTxt=(moPct==null)?'<div class="meta">historique en cours de constitution...</div>':'<div class="meta">depuis le debut : <span class="'+(moPct>=0?'up':'down')+'">'+(moPct>=0?'+':'')+moPct.toFixed(2)+'%</span></div>';
+        const dayPct = lc?lc.pct:null;
         const up=((moPct==null?0:moPct)>=0);
-        const valStr=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4});
+        const valStr=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
         const h=heldMontant(f.isin,f.value);
-        card.innerHTML='<div class="name">'+f.label+' &middot; '+f.isin+'</div>'
-          +'<div class="price">'+valStr+' '+f.currency+'</div>'
-          +dayTxt+sparkline(it.series100,gmin,gmax,up)+moTxt+heldLine(h)
-          +'<div class="meta">VL au '+dateFr+'</div>';
+        const shortName = f.label.replace("Amundi ","").replace(" ESR - F","");
+        row.innerHTML =
+          '<div><div class="top"><span class="nm">'+shortName+'</span><span class="pr">'+valStr+'</span></div>'
+          +'<div class="sub">'+pctSpan(dayPct,"j ")+pctSpan(moPct,"tot ")+heldTxt(h)+'</div></div>'
+          + sparkline(it.series100,gmin,gmax,up);
       } else {
-        card.innerHTML='<div class="name">'+f.label+' &middot; '+f.isin+'</div><div class="meta">VL non disponible</div>';
+        row.innerHTML='<div><div class="nm">'+f.label+'</div><div class="err">VL non disponible</div></div><svg class="spark"></svg>';
       }
-      aBox.appendChild(card);
+      aBox.appendChild(row);
     } else if(it.kind==="amundi-error"){
-      card.innerHTML='<div class="meta">Erreur : '+it.err+'</div>';
-      aBox.appendChild(card);
+      row.innerHTML='<div class="err">Erreur : '+it.err+'</div>';
+      aBox.appendChild(row);
     }
   });
 
   document.getElementById("scaleNote").innerHTML =
-    '<div class="scale-note">Courbes en base 100, echelle commune : de '+gmin.toFixed(1)+' a '+gmax.toFixed(1)+' (ligne pointillee = base 100). Sur 1 mois pour les valeurs cotees.</div>';
+    '<div class="scale-note">Courbes base 100, echelle commune '+gmin.toFixed(1)+'-'+gmax.toFixed(1)+'. j = jour, 1m = 1 mois, tot = depuis debut.</div>';
 
   renderTotal();
 }
