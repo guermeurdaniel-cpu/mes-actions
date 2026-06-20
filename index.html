@@ -44,13 +44,4 @@ async function loadAll(){
       card.innerHTML = `<div class="name">${t.label} · ${t.symbol}</div>
         <div class="price">${q.price.toFixed(2)} ${q.currency}</div>
         <div class="change ${cls}">${sign}${diff.toFixed(2)} (${sign}${pct.toFixed(2)}%)</div>
-        <div class="meta">Mis à jour : ${q.time.toLocaleTimeString("fr-FR")}</div>`;
-    }catch(e){
-      card.innerHTML = `<div class="name">${t.label}</div><div class="meta">Erreur : ${e.message}</div>`;
-    }
-  }
-}
-loadAll();
-</script>
-</body>
-</html>
+        <div class="
