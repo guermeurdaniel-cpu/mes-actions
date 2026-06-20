@@ -13,10 +13,11 @@
   .section { font-size:13px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:22px 4px 0; }
   .card { background:#1c1c1e; border-radius:18px; padding:20px; margin-top:12px; }
   .name { font-size:15px; color:#8e8e93; }
-  .price { font-size:34px; font-weight:700; margin:4px 0; }
-  .change { font-size:17px; font-weight:600; }
+  .price { font-size:32px; font-weight:700; margin:4px 0; }
+  .change { font-size:16px; font-weight:600; }
   .up { color:#30d158; } .down { color:#ff453a; }
   .meta { font-size:12px; color:#636366; margin-top:8px; }
+  .spark { margin-top:14px; width:100%; height:56px; display:block; }
   .refresh { display:block; margin:24px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:12px; padding:10px 18px; font-size:15px; font-weight:600; }
 </style>
 </head>
@@ -36,14 +37,40 @@ const TICKERS = [
   { symbol:"WPEA.PA", label:"ETF MSCI World (WPEA)" }
 ];
 
-async function fetchQuote(symbol){
-  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
+// --- Mini-courbe SVG à partir d'une liste de nombres ---
+function sparkline(values, up){
+  if(!values || values.length < 2) return "";
+  const w=300, h=56, pad=4;
+  const min=Math.min(...values), max=Math.max(...values);
+  const range = (max-min) || 1;
+  const pts = values.map((v,i)=>{
+    const x = pad + i*(w-2*pad)/(values.length-1);
+    const y = h-pad - (v-min)/range*(h-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const color = up ? "#30d158" : "#ff453a";
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline fill="none" stroke="${color}" stroke-width="2" points="${pts}"/>
+  </svg>`;
+}
+
+function variation(values){
+  if(!values || values.length < 2) return null;
+  const a=values[0], b=values[values.length-1];
+  return (b-a)/a*100;
+}
+
+// --- Valeurs cotées : prix courant + historique 1 mois via Yahoo ---
+async function fetchYahoo(symbol){
+  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1mo&interval=1d`;
   const url = `https://corsproxy.io/?url=${encodeURIComponent(yahoo)}`;
   const r = await fetch(url);
   if(!r.ok) throw new Error("HTTP " + r.status);
   const d = await r.json();
-  const m = d.chart.result[0].meta;
-  return { price:m.regularMarketPrice, prevClose:m.previousClose, currency:m.currency, time:new Date(m.regularMarketTime*1000) };
+  const res = d.chart.result[0];
+  const m = res.meta;
+  const closes = (res.indicators.quote[0].close || []).filter(v=>v!=null);
+  return { price:m.regularMarketPrice, prevClose:m.previousClose, currency:m.currency, time:new Date(m.regularMarketTime*1000), closes };
 }
 
 async function loadAll(){
@@ -53,12 +80,17 @@ async function loadAll(){
     card.innerHTML = `<div class="name">${t.label}</div><div class="price">…</div>`;
     c.appendChild(card);
     try{
-      const q = await fetchQuote(t.symbol);
+      const q = await fetchYahoo(t.symbol);
       const diff = q.price - q.prevClose, pct=(diff/q.prevClose)*100;
       const sign = diff>=0?"+":""; const cls = diff>=0?"up":"down";
+      const moPct = variation(q.closes);
+      const moTxt = moPct==null ? "" :
+        `<div class="meta">1 mois : <span class="${moPct>=0?'up':'down'}">${moPct>=0?'+':''}${moPct.toFixed(2)}%</span></div>`;
       card.innerHTML = `<div class="name">${t.label} · ${t.symbol}</div>
         <div class="price">${q.price.toFixed(2)} ${q.currency}</div>
         <div class="change ${cls}">${sign}${diff.toFixed(2)} (${sign}${pct.toFixed(2)}%)</div>
+        ${sparkline(q.closes, (moPct??0)>=0)}
+        ${moTxt}
         <div class="meta">Mis à jour : ${q.time.toLocaleTimeString("fr-FR")}</div>`;
     }catch(e){
       card.innerHTML = `<div class="name">${t.label}</div><div class="meta">⚠️ ${e.message}</div>`;
@@ -67,30 +99,39 @@ async function loadAll(){
   loadAmundi();
 }
 
+// --- Fonds Amundi : VL courante (nav.json) + historique (history.json) ---
 async function loadAmundi(){
   const box = document.getElementById("amundi");
   box.innerHTML = `<div class="card"><div class="meta">Chargement…</div></div>`;
   try{
-    const r = await fetch("nav.json?t=" + Date.now());
-    if(!r.ok) throw new Error("pas de nav.json");
-    const data = await r.json();
+    const [navR, histR] = await Promise.all([
+      fetch("nav.json?t=" + Date.now()),
+      fetch("history.json?t=" + Date.now()).catch(()=>null)
+    ]);
+    const data = await navR.json();
+    const hist = histR && histR.ok ? await histR.json() : {};
     box.innerHTML = "";
     for(const isin in data){
       const f = data[isin];
       const card = document.createElement("div"); card.className="card";
       if(f.status === "ok" && f.value != null){
         const dateFr = f.date.split("-").reverse().join("/");
+        const series = (hist[isin] || []).map(e=>e.value);
+        const moPct = variation(series);
+        const moTxt = moPct==null ? `<div class="meta">historique en cours de constitution…</div>` :
+          `<div class="meta">depuis le début : <span class="${moPct>=0?'up':'down'}">${moPct>=0?'+':''}${moPct.toFixed(2)}%</span></div>`;
         card.innerHTML = `<div class="name">${f.label} · ${f.isin}</div>
           <div class="price">${f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4})} ${f.currency}</div>
+          ${sparkline(series, (moPct??0)>=0)}
+          ${moTxt}
           <div class="meta">VL au ${dateFr}</div>`;
       } else {
-        card.innerHTML = `<div class="name">${f.label} · ${f.isin}</div>
-          <div class="meta">⚠️ VL non disponible</div>`;
+        card.innerHTML = `<div class="name">${f.label} · ${f.isin}</div><div class="meta">⚠️ VL non disponible</div>`;
       }
       box.appendChild(card);
     }
   }catch(e){
-    box.innerHTML = `<div class="card"><div class="meta">⚠️ Robot pas encore exécuté (${e.message})</div></div>`;
+    box.innerHTML = `<div class="card"><div class="meta">⚠️ ${e.message}</div></div>`;
   }
 }
 
