@@ -12,9 +12,13 @@
   h1 { font-size:17px; color:#8e8e93; text-align:center; margin:16px 0 4px; }
   .section { font-size:13px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:22px 4px 0; }
   .card { background:#1c1c1e; border-radius:18px; padding:20px; margin-top:12px; }
+  .total-card { background:#0a84ff; border-radius:18px; padding:20px; margin-top:12px; }
+  .total-card .lbl { font-size:14px; color:#cfe5ff; }
+  .total-card .amount { font-size:34px; font-weight:800; margin-top:4px; }
   .name { font-size:15px; color:#8e8e93; }
   .price { font-size:32px; font-weight:700; margin:4px 0; }
   .change { font-size:16px; font-weight:600; }
+  .held { font-size:15px; font-weight:600; color:#0a84ff; margin-top:10px; }
   .up { color:#30d158; } .down { color:#ff453a; }
   .meta { font-size:12px; color:#636366; margin-top:8px; }
   .spark { margin-top:14px; width:100%; height:56px; display:block; }
@@ -24,6 +28,8 @@
 <body>
   <h1>Mes valeurs</h1>
 
+  <div id="total"></div>
+
   <div class="section">Marche en direct</div>
   <div id="cards"></div>
 
@@ -32,10 +38,45 @@
 
   <button class="refresh" onclick="loadAll()">Actualiser</button>
 <script>
+// =======================================================
+//  NOMBRE DE PARTS DETENUES — modifie uniquement ici
+//  (cle = symbole pour les cotes, = ISIN pour les fonds Amundi)
+// =======================================================
+const QUANTITES = {
+  "AIR.PA": 0,                           // Airbus
+  "WPEA.PA": 0,                          // ETF MSCI World
+  "QS0009080175": 1156.7167 + 941.2472,  // Amundi Actions Internationales ESR
+  "QS0009080746": 75.4236,               // Amundi Label Equilibre ESR
+  "QS0009080720": 9.4187                 // Amundi Label Monetaire ESR
+};
+// =======================================================
+
 const TICKERS = [
   { symbol:"AIR.PA",  label:"Airbus" },
   { symbol:"WPEA.PA", label:"ETF MSCI World (WPEA)" }
 ];
+
+let totals = {};
+
+function formatEur(v){
+  return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR";
+}
+
+function heldLine(key, unitPrice){
+  const qty = QUANTITES[key] || 0;
+  const montant = qty * unitPrice;
+  totals[key] = montant;
+  if(qty <= 0) return "";
+  return '<div class="held">Detenu : '+formatEur(montant)+' ('+qty.toLocaleString("fr-FR")+' parts)</div>';
+}
+
+function renderTotal(){
+  let sum = 0;
+  for(const k in totals){ if(isFinite(totals[k])) sum += totals[k]; }
+  document.getElementById("total").innerHTML =
+    '<div class="total-card"><div class="lbl">Total du portefeuille</div>'
+    + '<div class="amount">'+formatEur(sum)+'</div></div>';
+}
 
 function sparkline(values, up){
   if(!values || values.length < 2) return "";
@@ -78,6 +119,7 @@ async function fetchYahoo(symbol){
 }
 
 async function loadAll(){
+  totals = {};
   const c = document.getElementById("cards"); c.innerHTML="";
   for(const t of TICKERS){
     const card = document.createElement("div"); card.className="card";
@@ -92,11 +134,13 @@ async function loadAll(){
       const moPct = variation(q.closes);
       const moTxt = (moPct==null) ? "" : '<div class="meta">1 mois : <span class="'+(moPct>=0?'up':'down')+'">'+(moPct>=0?'+':'')+moPct.toFixed(2)+'%</span></div>';
       const upFlag = ((moPct==null?0:moPct) >= 0);
+      const held = heldLine(t.symbol, q.price);
       card.innerHTML = '<div class="name">'+t.label+' &middot; '+t.symbol+'</div>'
         + '<div class="price">'+q.price.toFixed(2)+' '+q.currency+'</div>'
         + dayTxt
         + sparkline(q.closes, upFlag)
         + moTxt
+        + held
         + '<div class="meta">Mis a jour : '+q.time.toLocaleTimeString("fr-FR")+'</div>';
     }catch(e){
       card.innerHTML = '<div class="name">'+t.label+'</div><div class="meta">Erreur : '+e.message+'</div>';
@@ -127,19 +171,23 @@ async function loadAmundi(){
         const moTxt = (moPct==null) ? '<div class="meta">historique en cours de constitution...</div>' : '<div class="meta">depuis le debut : <span class="'+(moPct>=0?'up':'down')+'">'+(moPct>=0?'+':'')+moPct.toFixed(2)+'%</span></div>';
         const upFlag = ((moPct==null?0:moPct) >= 0);
         const valStr = f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4});
+        const held = heldLine(f.isin, f.value);
         card.innerHTML = '<div class="name">'+f.label+' &middot; '+f.isin+'</div>'
           + '<div class="price">'+valStr+' '+f.currency+'</div>'
           + dayTxt
           + sparkline(series, upFlag)
           + moTxt
+          + held
           + '<div class="meta">VL au '+dateFr+'</div>';
       } else {
         card.innerHTML = '<div class="name">'+f.label+' &middot; '+f.isin+'</div><div class="meta">VL non disponible</div>';
       }
       box.appendChild(card);
     }
+    renderTotal();
   }catch(e){
     box.innerHTML = '<div class="card"><div class="meta">Erreur : '+e.message+'</div></div>';
+    renderTotal();
   }
 }
 
