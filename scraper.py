@@ -23,20 +23,34 @@ def parse_num(s):
 
 def scrape_amundi(page, isin):
     url = f"https://www.amundi-ee.com/epargnant/product/view/{isin}"
-    print(f"[robot] (PEG) {url}")
-    try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
-    except Exception as e: print(f"[robot]   goto: {e}")
-    page.wait_for_timeout(8000)
-    text = page.inner_text("body")
-    value=None; nav_date=None
-    m = re.search(r'Valeur Liquidative\s*\(C\)\s*:\s*([\d \u00a0]+[.,]\d{2,4})', text)
-    if m: value = parse_num(m.group(1))
-    d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', text)
-    if d:
-        jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
-    if value is None:
-        print("[robot]   VL introuvable, extrait:"); print((text or '')[:800])
-    return value, nav_date
+    text = ""
+    for tentative in range(1, 5):   # jusqu'a 4 essais
+        print(f"[robot] (PEG) {url}  (essai {tentative}/4)")
+        try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
+        except Exception as e: print(f"[robot]   goto: {e}")
+        try:
+            page.wait_for_function(
+                "document.body && document.body.innerText.includes('Valeur Liquidative')",
+                timeout=25000)
+        except Exception:
+            print("[robot]   VL pas encore affichee...")
+        page.wait_for_timeout(3000)
+        text = page.inner_text("body")
+        if "Service Unavailable" in text:
+            print("[robot]   Amundi indisponible, nouvel essai dans 15s...")
+            page.wait_for_timeout(15000); continue
+        m = re.search(r'Valeur Liquidative\s*\(C\)\s*:\s*([\d \u00a0]+[.,]\d{2,4})', text)
+        if m:
+            value = parse_num(m.group(1))
+            nav_date = None
+            d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', text)
+            if d:
+                jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
+            return value, nav_date
+        print("[robot]   VL introuvable, nouvel essai dans 12s...")
+        page.wait_for_timeout(12000)
+    print("[robot]   echec apres 4 essais, extrait:"); print((text or '')[:800])
+    return None, None
 
 def scrape_abcbourse(page, url):
     print(f"[robot] (AV) {url}")
