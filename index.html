@@ -10,22 +10,30 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin:0; font-family:-apple-system,sans-serif; background:#0c0c0e; color:#fff; min-height:100vh; padding:env(safe-area-inset-top) 16px 24px; }
   h1 { font-size:17px; color:#8e8e93; text-align:center; margin:16px 0 4px; }
+  .section { font-size:13px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:22px 4px 0; }
   .card { background:#1c1c1e; border-radius:18px; padding:20px; margin-top:12px; }
   .name { font-size:15px; color:#8e8e93; }
-  .price { font-size:40px; font-weight:700; margin:4px 0; }
+  .price { font-size:34px; font-weight:700; margin:4px 0; }
   .change { font-size:17px; font-weight:600; }
   .up { color:#30d158; } .down { color:#ff453a; }
   .meta { font-size:12px; color:#636366; margin-top:8px; }
-  .refresh { display:block; margin:20px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:12px; padding:10px 18px; font-size:15px; font-weight:600; }
+  .refresh { display:block; margin:24px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:12px; padding:10px 18px; font-size:15px; font-weight:600; }
 </style>
 </head>
 <body>
   <h1>Mes valeurs</h1>
+
+  <div class="section">Marché en direct</div>
   <div id="cards"></div>
+
+  <div class="section">Fonds Amundi 🤖</div>
+  <div id="amundi"></div>
+
   <button class="refresh" onclick="loadAll()">Actualiser</button>
 <script>
 const TICKERS = [
-  { symbol:"AIR.PA", label:"Airbus" }
+  { symbol:"AIR.PA",  label:"Airbus" },
+  { symbol:"WPEA.PA", label:"ETF MSCI World (WPEA)" }
 ];
 
 async function fetchQuote(symbol){
@@ -56,7 +64,36 @@ async function loadAll(){
       card.innerHTML = `<div class="name">${t.label}</div><div class="meta">⚠️ ${e.message}</div>`;
     }
   }
+  loadAmundi();
 }
+
+async function loadAmundi(){
+  const box = document.getElementById("amundi");
+  box.innerHTML = `<div class="card"><div class="meta">Chargement…</div></div>`;
+  try{
+    const r = await fetch("nav.json?t=" + Date.now());
+    if(!r.ok) throw new Error("pas de nav.json");
+    const data = await r.json();
+    box.innerHTML = "";
+    for(const isin in data){
+      const f = data[isin];
+      const card = document.createElement("div"); card.className="card";
+      if(f.status === "ok" && f.value != null){
+        const dateFr = f.date.split("-").reverse().join("/");
+        card.innerHTML = `<div class="name">${f.label} · ${f.isin}</div>
+          <div class="price">${f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4})} ${f.currency}</div>
+          <div class="meta">VL au ${dateFr}</div>`;
+      } else {
+        card.innerHTML = `<div class="name">${f.label} · ${f.isin}</div>
+          <div class="meta">⚠️ VL non disponible</div>`;
+      }
+      box.appendChild(card);
+    }
+  }catch(e){
+    box.innerHTML = `<div class="card"><div class="meta">⚠️ Robot pas encore exécuté (${e.message})</div></div>`;
+  }
+}
+
 loadAll();
 setInterval(loadAll, 60000);
 </script>
