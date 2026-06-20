@@ -14,15 +14,15 @@
   .total-card { background:#0a84ff; border-radius:14px; padding:12px 16px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; }
   .total-card .lbl { font-size:13px; color:#cfe5ff; }
   .total-card .amount { font-size:22px; font-weight:800; }
-  .row { background:#1c1c1e; border-radius:12px; padding:10px 12px; margin-top:7px; display:grid; grid-template-columns:1fr 96px; grid-gap:8px; align-items:center; }
-  .row .top { display:flex; justify-content:space-between; align-items:baseline; }
-  .row .nm { font-size:13px; font-weight:600; color:#e5e5ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .row .pr { font-size:15px; font-weight:700; margin-left:8px; white-space:nowrap; }
-  .row .sub { font-size:11px; color:#8e8e93; margin-top:3px; display:flex; gap:8px; flex-wrap:wrap; }
-  .spark { width:96px; height:38px; display:block; grid-row:1 / span 2; align-self:center; }
+  .row { background:#1c1c1e; border-radius:12px; padding:10px 12px; margin-top:7px; display:grid; grid-template-columns:1fr 88px; grid-gap:10px; align-items:center; }
+  .info { min-width:0; }
+  .nm { font-size:13px; font-weight:600; color:#e5e5ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sub { font-size:11px; color:#8e8e93; margin-top:3px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .pr { font-size:16px; font-weight:700; color:#fff; }
   .up { color:#30d158; } .down { color:#ff453a; }
   .held { color:#0a84ff; font-weight:600; }
   .err { font-size:11px; color:#ff453a; }
+  .spark { width:88px; height:40px; display:block; }
   .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
   .refresh { display:block; margin:16px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:10px; padding:8px 16px; font-size:14px; font-weight:600; }
 </style>
@@ -88,7 +88,7 @@ function toBase100(values){
 
 function sparkline(values100, gmin, gmax, up){
   if(!values100 || values100.length < 2) return '<svg class="spark"></svg>';
-  const w=96, h=38, pad=3;
+  const w=88, h=40, pad=3;
   const range = (gmax-gmin) || 1;
   const yOf = function(v){ return h-pad - (v-gmin)/range*(h-2*pad); };
   const pts = values100.map(function(v,i){
@@ -185,12 +185,12 @@ async function loadAll(){
       const up=((moPct==null?0:moPct)>=0);
       const h=heldMontant(t.symbol,q.price);
       row.innerHTML =
-        '<div><div class="top"><span class="nm">'+t.label+'</span><span class="pr">'+q.price.toFixed(2)+'</span></div>'
-        +'<div class="sub">'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt(h)+'</div></div>'
+        '<div class="info"><div class="nm">'+t.label+'</div>'
+        +'<div class="sub"><span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt(h)+'</div></div>'
         + sparkline(it.series100,gmin,gmax,up);
       cBox.appendChild(row);
     } else if(it.kind==="yahoo-error"){
-      row.innerHTML='<div><div class="nm">'+it.t.label+'</div><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
+      row.innerHTML='<div class="info"><div class="nm">'+it.t.label+'</div><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
       cBox.appendChild(row);
     } else if(it.kind==="amundi"){
       const f=it.f;
@@ -203,15 +203,15 @@ async function loadAll(){
         const h=heldMontant(f.isin,f.value);
         const shortName = f.label.replace("Amundi ","").replace(" ESR - F","");
         row.innerHTML =
-          '<div><div class="top"><span class="nm">'+shortName+'</span><span class="pr">'+valStr+'</span></div>'
-          +'<div class="sub">'+pctSpan(dayPct,"j ")+pctSpan(moPct,"tot ")+heldTxt(h)+'</div></div>'
+          '<div class="info"><div class="nm">'+shortName+'</div>'
+          +'<div class="sub"><span class="pr">'+valStr+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"tot ")+heldTxt(h)+'</div></div>'
           + sparkline(it.series100,gmin,gmax,up);
       } else {
-        row.innerHTML='<div><div class="nm">'+f.label+'</div><div class="err">VL non disponible</div></div><svg class="spark"></svg>';
+        row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL non disponible</div></div><svg class="spark"></svg>';
       }
       aBox.appendChild(row);
     } else if(it.kind==="amundi-error"){
-      row.innerHTML='<div class="err">Erreur : '+it.err+'</div>';
+      row.innerHTML='<div class="info"><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
       aBox.appendChild(row);
     }
   });
