@@ -80,18 +80,25 @@ def main():
             if nav is None:
                 nav = found[0][1]; source = c["url"]
 
+    nav_date = None
     if nav is None:
-        nums = extract_numbers(page_text)
-        print(f"[robot] Fallback texte. Nombres plausibles : {nums[:10]}")
-        print("[robot] --- extrait texte page ---")
-        print((page_text or "")[:1500])
-        print("[robot] --- fin extrait ---")
-        if nums:
-            nav = nums[0]; source = "page_text"
+        # On vise précisément la ligne "Valeur Liquidative (C):39,44"
+        m = re.search(r'Valeur Liquidative\s*\(C\)\s*:\s*([\d \u00a0]+[.,]\d{2,4})', page_text)
+        if m:
+            nav = float(m.group(1).replace('\u00a0','').replace(' ','').replace(',', '.'))
+            source = "page_text (Valeur Liquidative C)"
+        # On récupère aussi la date officielle de la VL
+        d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', page_text)
+        if d:
+            jj, mm, aaaa = d.group(1).split("/")
+            nav_date = f"{aaaa}-{mm}-{jj}"
+        if nav is None:
+            print("[robot] VL non trouvee, extrait de page :")
+            print((page_text or "")[:1500])
 
     result = {
         "isin": ISIN, "value": nav, "currency": "EUR",
-        "date": datetime.date.today().isoformat(),
+        "date": nav_date or datetime.date.today().isoformat(),
         "source": source, "status": "ok" if nav is not None else "not_found",
     }
     with open(OUT, "w", encoding="utf-8") as f:
