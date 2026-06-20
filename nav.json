@@ -12,10 +12,10 @@
     "isin": "QS0009080746",
     "label": "Amundi Label Equilibre ESR - F",
     "category": "PEG",
-    "value": 328.68,
+    "value": null,
     "currency": "EUR",
-    "date": "2026-06-18",
-    "status": "ok"
+    "date": "2026-06-20",
+    "status": "not_found"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
@@ -28,29 +28,20 @@
   },
   "FR0011408798": {
     "isin": "FR0011408798",
-    "label": "Amundi Euro Liquidity-Rated Responsible",
+    "label": "Amundi Euro Liquidity-Rated",
     "category": "AV",
-    "value": null,
+    "value": 10906.28,
     "currency": "EUR",
-    "date": "2026-06-20",
-    "status": "not_found"
+    "date": "2026-06-19",
+    "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite AW EUR",
     "category": "AV",
-    "value": null,
+    "value": 1930.48,
     "currency": "EUR",
-    "date": "2026-06-20",
-    "status": "not_found"
-  },
-  "LU1681039647": {
-    "isin": "LU1681039647",
-    "label": "Amundi Euro Corporate SRI ETF",
-    "category": "AV",
-    "value": null,
-    "currency": "EUR",
-    "date": "2026-06-20",
-    "status": "not_found"
+    "date": "2026-06-18",
+    "status": "ok"
   }
 }
