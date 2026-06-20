@@ -52,8 +52,16 @@ def main():
                 pass
         page.on("response", on_response)
         print(f"[robot] Ouverture de {URL}")
-        page.goto(URL, wait_until="networkidle", timeout=60000)
-        page.wait_for_timeout(4000)
+        try:
+            page.goto(URL, wait_until="domcontentloaded", timeout=90000)
+        except Exception as e:
+            print(f"[robot] goto a renvoye : {e} (on continue quand meme)")
+        page.wait_for_timeout(8000)
+        try:
+            page.screenshot(path="debug.png", full_page=True)
+            print("[robot] capture d'ecran debug.png prise")
+        except Exception:
+            pass
         page_text = page.inner_text("body")
         browser.close()
 
