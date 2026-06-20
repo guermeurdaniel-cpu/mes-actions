@@ -73,7 +73,7 @@ async function fetchYahoo(symbol){
   const m = res.meta;
   const closes = (res.indicators.quote[0].close || []).filter(function(v){ return v!=null; });
   const price = (m.regularMarketPrice != null) ? m.regularMarketPrice : closes[closes.length-1];
-  const prevClose = (m.previousClose != null) ? m.previousClose : ((m.chartPreviousClose != null) ? m.chartPreviousClose : closes[closes.length-2]);
+  const prevClose = (m.previousClose != null) ? m.previousClose : closes[closes.length-2];
   return { price:price, prevClose:prevClose, currency:m.currency, time:new Date(m.regularMarketTime*1000), closes:closes };
 }
 
