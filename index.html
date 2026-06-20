@@ -10,10 +10,14 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin:0; font-family:-apple-system,sans-serif; background:#0c0c0e; color:#fff; min-height:100vh; padding:env(safe-area-inset-top) 12px 16px; }
   h1 { font-size:15px; color:#8e8e93; text-align:center; margin:10px 0 2px; }
-  .section { font-size:11px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:14px 4px 2px; }
-  .total-card { background:#0a84ff; border-radius:14px; padding:12px 16px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; }
-  .total-card .lbl { font-size:13px; color:#cfe5ff; }
-  .total-card .amount { font-size:22px; font-weight:800; }
+  .section { font-size:11px; color:#636366; text-transform:uppercase; letter-spacing:.5px; margin:16px 4px 2px; }
+  .tot { border-radius:14px; padding:12px 16px; margin-top:8px; }
+  .tot.peg { background:#0a84ff; }
+  .tot.av { background:#5e5ce6; }
+  .tot .lbl { font-size:13px; color:#e8e8ff; }
+  .tot .amount { font-size:22px; font-weight:800; }
+  .tot .ratio { font-size:12px; margin-top:4px; }
+  .ratio-ok { color:#9affc0; } .ratio-ko { color:#ffb3ab; }
   .row { background:#1c1c1e; border-radius:12px; padding:10px 12px; margin-top:7px; display:grid; grid-template-columns:1fr 88px; grid-gap:10px; align-items:center; }
   .info { min-width:0; }
   .nm { font-size:13px; font-weight:600; color:#e5e5ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -30,196 +34,193 @@
 <body>
   <h1>Mes valeurs</h1>
 
-  <div id="total"></div>
+  <div id="totPeg"></div>
+  <div class="section">PEG</div>
+  <div id="peg"></div>
 
-  <div class="section">Marche en direct</div>
-  <div id="cards"></div>
+  <div class="section">PEA</div>
+  <div id="refs"></div>
 
-  <div class="section">Fonds Amundi</div>
-  <div id="amundi"></div>
+  <div id="totAv"></div>
+  <div class="section">Assurance vie</div>
+  <div id="av"></div>
 
   <div id="scaleNote"></div>
   <button class="refresh" onclick="loadAll()">Actualiser</button>
 <script>
 // =======================================================
-//  NOMBRE DE PARTS DETENUES — modifie uniquement ici
+//  PARAMETRES — modifie uniquement ici
 // =======================================================
 const QUANTITES = {
-  "AIR.PA": 0,
-  "WPEA.PA": 0,
+  // PEG (fonds Amundi ESR + Airbus)
   "QS0009080175": 1156.7167 + 941.2472,
   "QS0009080746": 75.4236,
-  "QS0009080720": 9.4187
+  "QS0009080720": 9.4187,
+  "AIR.PA": 0,
+  // Assurance vie - unites de compte
+  "FR0011408798": 0.3081,
+  "FR0010149120": 1.7917,
+  "CC4.PA": 14.3676,        // ETF Amundi Euro Corporate SRI (LU1681039647)
+  // PEA (hors total)
+  "WPEA.PA": 0
 };
+const FONDS_EUROS = 18135;   // Assurance vie - fonds euros (valeur saisie a la main)
 // =======================================================
 
-const TICKERS = [
-  { symbol:"AIR.PA",  label:"Airbus" },
-  { symbol:"WPEA.PA", label:"ETF MSCI World" }
+// Valeurs cotees Yahoo : groupe "peg", "pea" ou "av"
+const MARKET = [
+  { symbol:"AIR.PA",  label:"Airbus",                 group:"peg" },
+  { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
+  { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" }
 ];
 
-let totals = {};
+let pegTotal=0, avUC=0;
 
-function formatEur(v){
-  return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR";
-}
-function heldMontant(key, unitPrice){
-  const qty = QUANTITES[key] || 0;
-  const montant = qty * unitPrice;
-  totals[key] = montant;
-  return { qty:qty, montant:montant };
-}
-function heldTxt(h){
-  if(h.qty <= 0) return "";
-  return '<span class="held">'+formatEur(h.montant)+'</span>';
-}
-function renderTotal(){
-  let sum = 0;
-  for(const k in totals){ if(isFinite(totals[k])) sum += totals[k]; }
-  document.getElementById("total").innerHTML =
-    '<div class="total-card"><span class="lbl">Total portefeuille</span>'
-    + '<span class="amount">'+formatEur(sum)+'</span></div>';
-}
+function eur(v){ return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR"; }
+function qtyOf(k){ return QUANTITES[k] || 0; }
 
 function toBase100(values){
-  if(!values || values.length < 2 || !values[0]) return null;
+  if(!values || values.length<2 || !values[0]) return null;
   return values.map(function(v){ return v/values[0]*100; });
 }
-
 function sparkline(values100, gmin, gmax, up){
-  if(!values100 || values100.length < 2) return '<svg class="spark"></svg>';
-  const w=88, h=40, pad=3;
-  const range = (gmax-gmin) || 1;
-  const yOf = function(v){ return h-pad - (v-gmin)/range*(h-2*pad); };
-  const pts = values100.map(function(v,i){
-    const x = pad + i*(w-2*pad)/(values100.length-1);
-    return x.toFixed(1)+","+yOf(v).toFixed(1);
-  }).join(" ");
-  const color = up ? "#30d158" : "#ff453a";
-  let baseline = "";
-  if(gmin <= 100 && gmax >= 100){
-    const y100 = yOf(100).toFixed(1);
-    baseline = '<line x1="'+pad+'" y1="'+y100+'" x2="'+(w-pad)+'" y2="'+y100+'" stroke="#48484a" stroke-width="1" stroke-dasharray="2,2"/>';
-  }
-  return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+baseline+'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+pts+'"/></svg>';
+  if(!values100 || values100.length<2) return '<svg class="spark"></svg>';
+  const w=88,h=40,pad=3, range=(gmax-gmin)||1;
+  const yOf=function(v){ return h-pad-(v-gmin)/range*(h-2*pad); };
+  const pts=values100.map(function(v,i){ return (pad+i*(w-2*pad)/(values100.length-1)).toFixed(1)+","+yOf(v).toFixed(1); }).join(" ");
+  const color=up?"#30d158":"#ff453a";
+  let bl="";
+  if(gmin<=100 && gmax>=100){ const y=yOf(100).toFixed(1); bl='<line x1="'+pad+'" y1="'+y+'" x2="'+(w-pad)+'" y2="'+y+'" stroke="#48484a" stroke-width="1" stroke-dasharray="2,2"/>'; }
+  return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bl+'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+pts+'"/></svg>';
 }
-
-function variation(values){
-  if(!values || values.length < 2) return null;
-  const a=values[0], b=values[values.length-1];
-  return (b-a)/a*100;
-}
-function lastChange(values){
-  if(!values || values.length < 2) return null;
-  const a=values[values.length-2], b=values[values.length-1];
-  return { diff:b-a, pct:(b-a)/a*100 };
-}
+function variation(values){ if(!values||values.length<2)return null; return (values[values.length-1]-values[0])/values[0]*100; }
+function lastChange(values){ if(!values||values.length<2)return null; const a=values[values.length-2],b=values[values.length-1]; return {diff:b-a,pct:(b-a)/a*100}; }
+function pctSpan(p,l){ if(p==null||!isFinite(p))return ""; return '<span class="'+(p>=0?'up':'down')+'">'+l+(p>=0?'+':'')+p.toFixed(2)+'%</span>'; }
 
 async function fetchYahoo(symbol){
-  const yahoo = "https://query1.finance.yahoo.com/v8/finance/chart/"+symbol+"?range=1mo&interval=1d";
-  const url = "https://corsproxy.io/?url="+encodeURIComponent(yahoo);
-  const r = await fetch(url);
-  if(!r.ok) throw new Error("HTTP " + r.status);
-  const d = await r.json();
-  const res = d.chart.result[0];
-  const m = res.meta;
-  const closes = (res.indicators.quote[0].close || []).filter(function(v){ return v!=null; });
-  const price = (m.regularMarketPrice != null) ? m.regularMarketPrice : closes[closes.length-1];
-  const prevClose = (m.previousClose != null) ? m.previousClose : closes[closes.length-2];
-  return { price:price, prevClose:prevClose, currency:m.currency, time:new Date(m.regularMarketTime*1000), closes:closes };
+  const y="https://query1.finance.yahoo.com/v8/finance/chart/"+symbol+"?range=1mo&interval=1d";
+  const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(y));
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d=await r.json(); const res=d.chart.result[0]; const m=res.meta;
+  const closes=(res.indicators.quote[0].close||[]).filter(function(v){return v!=null;});
+  const price=(m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
+  const prev=(m.previousClose!=null)?m.previousClose:closes[closes.length-2];
+  return {price:price,prev:prev,cur:m.currency,closes:closes};
 }
 
-function pctSpan(pct, label){
-  if(pct==null || !isFinite(pct)) return "";
-  return '<span class="'+(pct>=0?'up':'down')+'">'+label+(pct>=0?'+':'')+pct.toFixed(2)+'%</span>';
+function rowYahoo(it, gmin, gmax){
+  const q=it.q;
+  const dayPct=(q.prev?(q.price-q.prev)/q.prev*100:null);
+  const moPct=variation(q.closes);
+  const h=qtyOf(it.symbol)*q.price;
+  const heldTxt=(qtyOf(it.symbol)>0)?'<span class="held">'+eur(h)+'</span>':"";
+  return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
+    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt
+    +'</div></div>'+sparkline(toBase100(q.closes),gmin,gmax,(moPct==null?0:moPct)>=0);
+}
+function rowFund(f, series, gmin, gmax){
+  const moPct=variation(series), lc=lastChange(series);
+  const h=qtyOf(f.isin)*f.value;
+  const heldTxt=(qtyOf(f.isin)>0)?'<span class="held">'+eur(h)+'</span>':"";
+  const val=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  return '<div class="info"><div class="nm">'+f.label+'</div><div class="sub">'
+    +'<span class="pr">'+val+'</span>'+pctSpan(lc?lc.pct:null,"j ")+pctSpan(moPct,"tot ")+heldTxt
+    +'</div></div>'+sparkline(toBase100(series),gmin,gmax,(moPct==null?0:moPct)>=0);
 }
 
 async function loadAll(){
-  totals = {};
-  document.getElementById("cards").innerHTML = '<div class="row"><div class="sub">Chargement...</div></div>';
-  document.getElementById("amundi").innerHTML = "";
-  document.getElementById("scaleNote").innerHTML = "";
+  pegTotal=0; avUC=0;
+  document.getElementById("peg").innerHTML='<div class="row"><div class="sub">Chargement...</div></div>';
+  document.getElementById("refs").innerHTML="";
+  document.getElementById("av").innerHTML="";
 
-  const items = [];
-
-  for(const t of TICKERS){
-    try{
-      const q = await fetchYahoo(t.symbol);
-      items.push({ kind:"yahoo", t:t, q:q, series100: toBase100(q.closes) });
-    }catch(e){
-      items.push({ kind:"yahoo-error", t:t, err:e.message });
-    }
+  // Yahoo
+  const yres={};
+  for(const t of MARKET){
+    try{ yres[t.symbol]={t:t, q:await fetchYahoo(t.symbol)}; }
+    catch(e){ yres[t.symbol]={t:t, err:e.message}; }
   }
-
+  // nav.json + history.json
+  let data={}, hist={};
   try{
-    const navR = await fetch("nav.json?t=" + Date.now());
-    let histR = null;
-    try { histR = await fetch("history.json?t=" + Date.now()); } catch(e){ histR = null; }
-    const data = await navR.json();
-    const hist = (histR && histR.ok) ? await histR.json() : {};
-    for(const isin in data){
-      const f = data[isin];
-      const series = (f.status==="ok" && f.value!=null) ? (hist[isin]||[]).map(function(e){return e.value;}) : [];
-      items.push({ kind:"amundi", f:f, series:series, series100: toBase100(series) });
-    }
-  }catch(e){
-    items.push({ kind:"amundi-error", err:e.message });
+    const navR=await fetch("nav.json?t="+Date.now());
+    data=await navR.json();
+    try{ const hR=await fetch("history.json?t="+Date.now()); if(hR.ok) hist=await hR.json(); }catch(e){}
+  }catch(e){}
+
+  // Echelle base 100 commune a toutes les courbes
+  let gmin=Infinity, gmax=-Infinity;
+  function scan(s){ const b=toBase100(s); if(b) b.forEach(function(v){ if(v<gmin)gmin=v; if(v>gmax)gmax=v; }); }
+  for(const k in yres){ if(yres[k].q) scan(yres[k].q.closes); }
+  for(const isin in data){ if(data[isin].status==="ok") scan((hist[isin]||[]).map(function(e){return e.value;})); }
+  if(!isFinite(gmin)||!isFinite(gmax)||gmin===gmax){ gmin=95; gmax=105; }
+
+  // --- PEG (fonds Amundi + Airbus) ---
+  const pegBox=document.getElementById("peg"); pegBox.innerHTML="";
+  for(const isin in data){
+    const f=data[isin]; if(f.category!=="PEG") continue;
+    const row=document.createElement("div"); row.className="row";
+    if(f.status==="ok" && f.value!=null){
+      const series=(hist[isin]||[]).map(function(e){return e.value;});
+      row.innerHTML=rowFund(f,series,gmin,gmax);
+      pegTotal += qtyOf(isin)*f.value;
+    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
+    pegBox.appendChild(row);
   }
+  // Airbus (cote Yahoo) compte dans le PEG
+  const air=yres["AIR.PA"];
+  if(air){
+    const row=document.createElement("div"); row.className="row";
+    if(air.q){ row.innerHTML=rowYahoo({symbol:"AIR.PA",label:air.t.label,q:air.q},gmin,gmax); pegTotal += qtyOf("AIR.PA")*air.q.price; }
+    else { row.innerHTML='<div class="info"><div class="nm">Airbus</div><div class="err">'+air.err+'</div></div><svg class="spark"></svg>'; }
+    pegBox.appendChild(row);
+  }
+  document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
 
-  let gmin = Infinity, gmax = -Infinity;
-  items.forEach(function(it){
-    if(it.series100){ it.series100.forEach(function(v){ if(v<gmin) gmin=v; if(v>gmax) gmax=v; }); }
-  });
-  if(!isFinite(gmin) || !isFinite(gmax) || gmin===gmax){ gmin=95; gmax=105; }
-
-  const cBox = document.getElementById("cards"); cBox.innerHTML="";
-  const aBox = document.getElementById("amundi"); aBox.innerHTML="";
-
-  items.forEach(function(it){
-    const row = document.createElement("div"); row.className="row";
-    if(it.kind==="yahoo"){
-      const q=it.q, t=it.t;
-      const diff=q.price-q.prevClose, pct=(diff/q.prevClose)*100;
-      const dayPct = isFinite(pct)?pct:null;
-      const moPct=variation(q.closes);
-      const up=((moPct==null?0:moPct)>=0);
-      const h=heldMontant(t.symbol,q.price);
-      row.innerHTML =
-        '<div class="info"><div class="nm">'+t.label+'</div>'
-        +'<div class="sub"><span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt(h)+'</div></div>'
-        + sparkline(it.series100,gmin,gmax,up);
-      cBox.appendChild(row);
-    } else if(it.kind==="yahoo-error"){
-      row.innerHTML='<div class="info"><div class="nm">'+it.t.label+'</div><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
-      cBox.appendChild(row);
-    } else if(it.kind==="amundi"){
-      const f=it.f;
-      if(f.status==="ok" && f.value!=null){
-        const moPct=variation(it.series);
-        const lc=lastChange(it.series);
-        const dayPct = lc?lc.pct:null;
-        const up=((moPct==null?0:moPct)>=0);
-        const valStr=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
-        const h=heldMontant(f.isin,f.value);
-        const shortName = f.label.replace("Amundi ","").replace(" ESR - F","");
-        row.innerHTML =
-          '<div class="info"><div class="nm">'+shortName+'</div>'
-          +'<div class="sub"><span class="pr">'+valStr+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"tot ")+heldTxt(h)+'</div></div>'
-          + sparkline(it.series100,gmin,gmax,up);
-      } else {
-        row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL non disponible</div></div><svg class="spark"></svg>';
-      }
-      aBox.appendChild(row);
-    } else if(it.kind==="amundi-error"){
-      row.innerHTML='<div class="info"><div class="err">Erreur : '+it.err+'</div></div><svg class="spark"></svg>';
-      aBox.appendChild(row);
-    }
+  // --- PEA (ETF Monde seul, hors total) ---
+  const refBox=document.getElementById("refs"); refBox.innerHTML="";
+  ["WPEA.PA"].forEach(function(sym){
+    const it=yres[sym]; if(!it) return;
+    const row=document.createElement("div"); row.className="row";
+    if(it.q){ row.innerHTML=rowYahoo({symbol:sym,label:it.t.label,q:it.q},gmin,gmax); }
+    else { row.innerHTML='<div class="info"><div class="nm">'+it.t.label+'</div><div class="err">'+it.err+'</div></div><svg class="spark"></svg>'; }
+    refBox.appendChild(row);
   });
 
-  document.getElementById("scaleNote").innerHTML =
-    '<div class="scale-note">Courbes base 100, echelle commune '+gmin.toFixed(1)+'-'+gmax.toFixed(1)+'. j = jour, 1m = 1 mois, tot = depuis debut.</div>';
+  // --- Assurance vie ---
+  const avBox=document.getElementById("av"); avBox.innerHTML="";
+  for(const isin in data){
+    const f=data[isin]; if(f.category!=="AV") continue;
+    const row=document.createElement("div"); row.className="row";
+    if(f.status==="ok" && f.value!=null){
+      const series=(hist[isin]||[]).map(function(e){return e.value;});
+      row.innerHTML=rowFund(f,series,gmin,gmax);
+      avUC += qtyOf(isin)*f.value;
+    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
+    avBox.appendChild(row);
+  }
+  // ETF CC4 via Yahoo (AV)
+  const cc4=yres["CC4.PA"];
+  if(cc4){
+    const row=document.createElement("div"); row.className="row";
+    if(cc4.q){ row.innerHTML=rowYahoo({symbol:"CC4.PA",label:cc4.t.label,q:cc4.q},gmin,gmax); avUC += qtyOf("CC4.PA")*cc4.q.price; }
+    else { row.innerHTML='<div class="info"><div class="nm">'+cc4.t.label+'</div><div class="err">'+cc4.err+'</div></div><svg class="spark"></svg>'; }
+    avBox.appendChild(row);
+  }
+  // Fonds euros (manuel)
+  const rowFE=document.createElement("div"); rowFE.className="row";
+  rowFE.innerHTML='<div class="info"><div class="nm">Fonds euros</div><div class="sub"><span class="pr">'+eur(FONDS_EUROS)+'</span><span class="held">'+eur(FONDS_EUROS)+'</span></div></div><svg class="spark"></svg>';
+  avBox.appendChild(rowFE);
 
-  renderTotal();
+  // Total AV + ratio UC
+  const avTotal = avUC + FONDS_EUROS;
+  const ratio = avTotal>0 ? avUC/avTotal*100 : 0;
+  const cls = ratio>=30 ? "ratio-ok" : "ratio-ko";
+  document.getElementById("totAv").innerHTML=
+    '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
+    +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
+
+  document.getElementById("scaleNote").innerHTML='<div class="scale-note">Courbes base 100, echelle commune '+gmin.toFixed(1)+'-'+gmax.toFixed(1)+'. j=jour, 1m=1 mois, tot=depuis debut.</div>';
 }
 
 loadAll();
