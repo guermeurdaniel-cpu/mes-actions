@@ -32,10 +32,11 @@ jobs:
         run: |
           git config user.name "nav-bot"
           git config user.email "nav-bot@users.noreply.github.com"
-          if [ -n "$(git status --porcelain nav.json)" ]; then
-            git add nav.json
+          if [ -n "$(git status --porcelain nav.json history.json)" ]; then
+            git add nav.json history.json
             git commit -m "MAJ VL Amundi"
             git push
+
           else
             echo "Aucun changement de VL."
           fi
