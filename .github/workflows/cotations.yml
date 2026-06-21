@@ -1,0 +1,32 @@
+name: Telecharge cotation (ISIN)
+
+on:
+  workflow_dispatch:
+    inputs:
+      isin:
+        description: "ISIN ou symbole Yahoo (ex: NL0000235190 ou AIR.PA)"
+        required: true
+        default: "NL0000235190"
+
+permissions:
+  contents: write
+
+jobs:
+  cotation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Telecharger
+        env:
+          ISIN: ${{ github.event.inputs.isin }}
+        run: python cotations.py
+      - name: Commiter
+        run: |
+          git config user.name "nav-bot"
+          git config user.email "nav-bot@users.noreply.github.com"
+          git add *.csv
+          git commit -m "Cotation ${{ github.event.inputs.isin }}"
+          git push
