@@ -24,7 +24,7 @@ def parse_num(s):
 def scrape_amundi(page, isin):
     url = f"https://www.amundi-ee.com/epargnant/product/view/{isin}"
     text = ""
-    for tentative in range(1, 5):   # jusqu'a 4 essais
+    for tentative in range(1, 5):
         print(f"[robot] (PEG) {url}  (essai {tentative}/4)")
         try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
         except Exception as e: print(f"[robot]   goto: {e}")
@@ -84,6 +84,13 @@ def merge_history(history, isin, date, value):
     arr.sort(key=lambda e:e["date"]); history[isin]=arr[-400:]
     return history
 
+def last_known(history, isin):
+    arr = history.get(isin, [])
+    if arr:
+        last = arr[-1]
+        return last["value"], last["date"]
+    return None, None
+
 def main():
     results={}; history=load_json(HIST,{})
     with sync_playwright() as p:
@@ -91,11 +98,25 @@ def main():
         for f in FONDS:
             if f["source"]=="amundi-ee": value,nav_date=scrape_amundi(page,f["isin"])
             else: value,nav_date=scrape_abcbourse(page,f["url"])
-            date=nav_date or datetime.date.today().isoformat()
-            results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                "value":value,"currency":"EUR","date":date,"status":"ok" if value is not None else "not_found"}
+
+            if value is not None:
+                # Succes : valeur du jour
+                date = nav_date or datetime.date.today().isoformat()
+                results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
+                    "value":value,"currency":"EUR","date":date,"status":"ok"}
+                merge_history(history,f["isin"],date,value)
+            else:
+                # Echec : on reprend la derniere valeur connue dans l'historique
+                old_val, old_date = last_known(history, f["isin"])
+                if old_val is not None:
+                    print(f"[robot]   -> reprise derniere VL connue : {old_val} ({old_date})")
+                    results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
+                        "value":old_val,"currency":"EUR","date":old_date,"status":"ancien"}
+                else:
+                    results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
+                        "value":None,"currency":"EUR","date":datetime.date.today().isoformat(),"status":"not_found"}
+
             print(f"[robot] {f['isin']} -> {results[f['isin']]}")
-            if value is not None: merge_history(history,f["isin"],date,value)
         browser.close()
     with open(OUT,"w",encoding="utf-8") as fh: json.dump(results,fh,ensure_ascii=False,indent=2)
     with open(HIST,"w",encoding="utf-8") as fh: json.dump(history,fh,ensure_ascii=False,indent=2)
