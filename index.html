@@ -62,4 +62,169 @@ const QUANTITES = {
   // Assurance vie - unites de compte
   "FR0011408798": 0.299,
   "FR0010149120": 1.6917,
-  "CC4.PA": 14.3676,        // ETF Amundi Euro
+  "CC4.PA": 14.3676,        // ETF Amundi Euro Corporate SRI (LU1681039647)
+  // PEA
+  "WPEA.PA": 2187
+};
+const FONDS_EUROS = 18135;   // Assurance vie - fonds euros (valeur saisie a la main)
+// =======================================================
+
+// Valeurs cotees Yahoo : groupe "peg", "pea" ou "av"
+const MARKET = [
+  { symbol:"AIR.PA",  label:"Airbus",                 group:"peg" },
+  { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
+  { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" }
+];
+
+let pegTotal=0, avUC=0, peaTotal=0;
+
+function eur(v){ return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR"; }
+function qtyOf(k){ return QUANTITES[k] || 0; }
+
+function toBase100(values){
+  if(!values || values.length<2 || !values[0]) return null;
+  return values.map(function(v){ return v/values[0]*100; });
+}
+function sparkline(values100, gmin, gmax, up){
+  if(!values100 || values100.length<2) return '<svg class="spark"></svg>';
+  const w=88,h=40,pad=3, range=(gmax-gmin)||1;
+  const yOf=function(v){ return h-pad-(v-gmin)/range*(h-2*pad); };
+  const pts=values100.map(function(v,i){ return (pad+i*(w-2*pad)/(values100.length-1)).toFixed(1)+","+yOf(v).toFixed(1); }).join(" ");
+  const color=up?"#30d158":"#ff453a";
+  let bl="";
+  if(gmin<=100 && gmax>=100){ const y=yOf(100).toFixed(1); bl='<line x1="'+pad+'" y1="'+y+'" x2="'+(w-pad)+'" y2="'+y+'" stroke="#48484a" stroke-width="1" stroke-dasharray="2,2"/>'; }
+  return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bl+'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+pts+'"/></svg>';
+}
+function variation(values){ if(!values||values.length<2)return null; return (values[values.length-1]-values[0])/values[0]*100; }
+function lastChange(values){ if(!values||values.length<2)return null; const a=values[values.length-2],b=values[values.length-1]; return {diff:b-a,pct:(b-a)/a*100}; }
+function pctSpan(p,l){ if(p==null||!isFinite(p))return ""; return '<span class="'+(p>=0?'up':'down')+'">'+l+(p>=0?'+':'')+p.toFixed(2)+'%</span>'; }
+
+async function fetchYahoo(symbol){
+  const y="https://query1.finance.yahoo.com/v8/finance/chart/"+symbol+"?range=1mo&interval=1d";
+  const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(y));
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d=await r.json(); const res=d.chart.result[0]; const m=res.meta;
+  const closes=(res.indicators.quote[0].close||[]).filter(function(v){return v!=null;});
+  const price=(m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
+  const prev=(m.previousClose!=null)?m.previousClose:closes[closes.length-2];
+  return {price:price,prev:prev,cur:m.currency,closes:closes};
+}
+
+function rowYahoo(it, gmin, gmax){
+  const q=it.q;
+  const dayPct=(q.prev?(q.price-q.prev)/q.prev*100:null);
+  const moPct=variation(q.closes);
+  const h=qtyOf(it.symbol)*q.price;
+  const heldTxt=(qtyOf(it.symbol)>0)?'<span class="held">'+eur(h)+'</span>':"";
+  return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
+    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt
+    +'</div></div>'+sparkline(toBase100(q.closes),gmin,gmax,(moPct==null?0:moPct)>=0);
+}
+function rowFund(f, series, gmin, gmax){
+  const moPct=variation(series), lc=lastChange(series);
+  const h=qtyOf(f.isin)*f.value;
+  const heldTxt=(qtyOf(f.isin)>0)?'<span class="held">'+eur(h)+'</span>':"";
+  const val=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const oldTxt=(f.status==="ancien")?'<span style="color:#ff9f0a">ancien</span>':"";
+  return '<div class="info"><div class="nm">'+f.label+'</div><div class="sub">'
+    +'<span class="pr">'+val+'</span>'+oldTxt+pctSpan(lc?lc.pct:null,"j ")+pctSpan(moPct,"tot ")+heldTxt
+    +'</div></div>'+sparkline(toBase100(series),gmin,gmax,(moPct==null?0:moPct)>=0);
+}
+
+async function loadAll(){
+  pegTotal=0; avUC=0; peaTotal=0;
+  document.getElementById("peg").innerHTML='<div class="row"><div class="sub">Chargement...</div></div>';
+  document.getElementById("refs").innerHTML="";
+  document.getElementById("av").innerHTML="";
+
+  // Yahoo
+  const yres={};
+  for(const t of MARKET){
+    try{ yres[t.symbol]={t:t, q:await fetchYahoo(t.symbol)}; }
+    catch(e){ yres[t.symbol]={t:t, err:e.message}; }
+  }
+  // nav.json + history.json
+  let data={}, hist={};
+  try{
+    const navR=await fetch("nav.json?t="+Date.now());
+    data=await navR.json();
+    try{ const hR=await fetch("history.json?t="+Date.now()); if(hR.ok) hist=await hR.json(); }catch(e){}
+  }catch(e){}
+
+  // Echelle base 100 commune a toutes les courbes
+  let gmin=Infinity, gmax=-Infinity;
+  function scan(s){ const b=toBase100(s); if(b) b.forEach(function(v){ if(v<gmin)gmin=v; if(v>gmax)gmax=v; }); }
+  for(const k in yres){ if(yres[k].q) scan(yres[k].q.closes); }
+  for(const isin in data){ if(data[isin].status!=="not_found") scan((hist[isin]||[]).map(function(e){return e.value;})); }
+  if(!isFinite(gmin)||!isFinite(gmax)||gmin===gmax){ gmin=95; gmax=105; }
+
+  // --- PEG (fonds Amundi + Airbus) ---
+  const pegBox=document.getElementById("peg"); pegBox.innerHTML="";
+  for(const isin in data){
+    const f=data[isin]; if(f.category!=="PEG") continue;
+    const row=document.createElement("div"); row.className="row";
+    if(f.value!=null){
+      const series=(hist[isin]||[]).map(function(e){return e.value;});
+      row.innerHTML=rowFund(f,series,gmin,gmax);
+      pegTotal += qtyOf(isin)*f.value;
+    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
+    pegBox.appendChild(row);
+  }
+  const air=yres["AIR.PA"];
+  if(air){
+    const row=document.createElement("div"); row.className="row";
+    if(air.q){ row.innerHTML=rowYahoo({symbol:"AIR.PA",label:air.t.label,q:air.q},gmin,gmax); pegTotal += qtyOf("AIR.PA")*air.q.price; }
+    else { row.innerHTML='<div class="info"><div class="nm">Airbus</div><div class="err">'+air.err+'</div></div><svg class="spark"></svg>'; }
+    pegBox.appendChild(row);
+  }
+  document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
+
+  // --- PEA (ETF Monde) ---
+  const refBox=document.getElementById("refs"); refBox.innerHTML="";
+  ["WPEA.PA"].forEach(function(sym){
+    const it=yres[sym]; if(!it) return;
+    const row=document.createElement("div"); row.className="row";
+    if(it.q){ row.innerHTML=rowYahoo({symbol:sym,label:it.t.label,q:it.q},gmin,gmax); peaTotal += qtyOf(sym)*it.q.price; }
+    else { row.innerHTML='<div class="info"><div class="nm">'+it.t.label+'</div><div class="err">'+it.err+'</div></div><svg class="spark"></svg>'; }
+    refBox.appendChild(row);
+  });
+  document.getElementById("totPea").innerHTML='<div class="tot pea"><div class="lbl">Total PEA</div><div class="amount">'+eur(peaTotal)+'</div></div>';
+
+  // --- Assurance vie ---
+  const avBox=document.getElementById("av"); avBox.innerHTML="";
+  for(const isin in data){
+    const f=data[isin]; if(f.category!=="AV") continue;
+    const row=document.createElement("div"); row.className="row";
+    if(f.value!=null){
+      const series=(hist[isin]||[]).map(function(e){return e.value;});
+      row.innerHTML=rowFund(f,series,gmin,gmax);
+      avUC += qtyOf(isin)*f.value;
+    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
+    avBox.appendChild(row);
+  }
+  const cc4=yres["CC4.PA"];
+  if(cc4){
+    const row=document.createElement("div"); row.className="row";
+    if(cc4.q){ row.innerHTML=rowYahoo({symbol:"CC4.PA",label:cc4.t.label,q:cc4.q},gmin,gmax); avUC += qtyOf("CC4.PA")*cc4.q.price; }
+    else { row.innerHTML='<div class="info"><div class="nm">'+cc4.t.label+'</div><div class="err">'+cc4.err+'</div></div><svg class="spark"></svg>'; }
+    avBox.appendChild(row);
+  }
+  const rowFE=document.createElement("div"); rowFE.className="row";
+  rowFE.innerHTML='<div class="info"><div class="nm">Fonds euros</div><div class="sub"><span class="pr">'+eur(FONDS_EUROS)+'</span><span class="held">'+eur(FONDS_EUROS)+'</span></div></div><svg class="spark"></svg>';
+  avBox.appendChild(rowFE);
+
+  const avTotal = avUC + FONDS_EUROS;
+  const ratio = avTotal>0 ? avUC/avTotal*100 : 0;
+  const cls = ratio>=30 ? "ratio-ok" : "ratio-ko";
+  document.getElementById("totAv").innerHTML=
+    '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
+    +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
+
+  document.getElementById("scaleNote").innerHTML='<div class="scale-note">Courbes base 100, echelle commune '+gmin.toFixed(1)+'-'+gmax.toFixed(1)+'. j=jour, 1m=1 mois, tot=depuis debut.</div>';
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
