@@ -3,27 +3,27 @@
     "isin": "QS0009080175",
     "label": "Amundi Actions Internationales ESR - F",
     "category": "PEG",
-    "value": 39.44,
+    "value": 39.46,
     "currency": "EUR",
-    "date": "2026-06-18",
+    "date": "2026-06-19",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Amundi Label Equilibre ESR - F",
     "category": "PEG",
-    "value": 327.78,
+    "value": 328.84,
     "currency": "EUR",
-    "date": "2026-06-19",
+    "date": "2026-06-22",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Amundi Label Monetaire ESR - F",
     "category": "PEG",
-    "value": 1309.0403,
+    "value": 1309.123,
     "currency": "EUR",
-    "date": "2026-06-22",
+    "date": "2026-06-23",
     "status": "ok"
   },
   "FR0011408798": {
@@ -39,9 +39,9 @@
     "isin": "FR0010149120",
     "label": "Carmignac Securite AW EUR",
     "category": "AV",
-    "value": 1928.76,
+    "value": 1929.71,
     "currency": "EUR",
-    "date": "2026-06-19",
+    "date": "2026-06-22",
     "status": "ok"
   }
 }
