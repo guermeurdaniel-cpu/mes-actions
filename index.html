@@ -30,10 +30,28 @@
   .spark { width:88px; height:40px; display:block; }
   .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
   .refresh { display:block; margin:16px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:10px; padding:8px 16px; font-size:14px; font-weight:600; }
+  .synth { background:linear-gradient(135deg,#0e3a2f,#0a2a45); border-radius:16px; padding:14px 16px; margin-top:10px; }
+  .synth .lbl { font-size:13px; color:#bfe9d6; }
+  .synth .big { font-size:26px; font-weight:800; margin-top:2px; }
+  .synth .meta { font-size:12px; color:#cfe6ff; margin-top:2px; }
+  .bar { height:14px; border-radius:7px; background:#1c1c1e; overflow:hidden; margin:10px 0 4px; position:relative; display:flex; }
+  .bar .eq { background:#30d158; height:100%; }
+  .bar .df { background:#0a84ff; height:100%; }
+  .bar .tgt { position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; }
+  .legend2 { font-size:11px; color:#8e8e93; display:flex; gap:14px; flex-wrap:wrap; }
+  .sig-ok { color:#9affc0; } .sig-ko { color:#ffd479; }
+  .geo { margin-top:10px; }
+  .barg { height:12px; border-radius:6px; overflow:hidden; display:flex; background:#1c1c1e; margin:6px 0 4px; }
+  .barg .w { background:#5e9eff; height:100%; }
+  .barg .e { background:#ffd479; height:100%; }
+  .barg .m { background:#ff6482; height:100%; }
+  .gap { color:#ff8fa3; }
 </style>
 </head>
 <body>
   <h1>Mes valeurs</h1>
+
+  <div id="synth"></div>
 
   <div id="totPeg"></div>
   <div class="section">PEG</div>
@@ -67,6 +85,30 @@ const QUANTITES = {
   "WPEA.PA": 5863
 };
 const FONDS_EUROS = 18135;   // Assurance vie - fonds euros (valeur saisie a la main)
+
+// --- Synthese allocation actions / defensif : parametres ---
+const EQ_EQUILIBRE   = 0.50;   // part ACTIONS du fonds Amundi Label Equilibre ESR (bande de gestion 35-65%)
+const TARGET_ACTIONS = 0.70;   // cible actions du patrimoine consolide
+const BANDE          = 0.05;   // demi-bande de reequilibrage (0.05 = +/- 5 points)
+const EQUITY_FRACTION = {
+  "QS0009080175": 1.00,          // Amundi Actions Internationales ESR (actions monde)
+  "QS0009080746": EQ_EQUILIBRE,  // Amundi Label Equilibre ESR (mixte)
+  "QS0009080720": 0.00,          // Amundi Label Monetaire ESR
+  "AIR.PA":       1.00,          // Airbus
+  "FR0011408798": 0.00,          // Amundi Euro Liquidity-Rated
+  "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
+  "CC4.PA":       0.00,          // Amundi Euro Corporate SRI (oblig)
+  "WPEA.PA":      1.00           // ETF MSCI World
+};
+
+// --- Repartition geographique des ACTIONS (par mandat d'indice) ---
+const TARGET_EM = 0.10;  // cible emergents en part de la poche actions (0.10 = 10%)
+const GEO_EQUITY = {
+  "QS0009080175": { world:1.00, euro:0.00, em:0.00 }, // benchmark MSCI World
+  "QS0009080746": { world:0.50, euro:0.50, em:0.00 }, // poche actions = 1/2 World + 1/2 zone euro
+  "AIR.PA":       { world:0.00, euro:1.00, em:0.00 }, // Airbus = zone euro
+  "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }  // MSCI World
+};
 // =======================================================
 
 // Valeurs cotees Yahoo : groupe "peg", "pea" ou "av"
@@ -219,6 +261,53 @@ async function loadAll(){
   document.getElementById("totAv").innerHTML=
     '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
     +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
+
+  // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
+  (function(){
+    function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
+    function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
+    function holdingEur(k){ return (k==="WPEA.PA"||k==="CC4.PA"||k==="AIR.PA")? valYahoo(k) : valFund(k); }
+    var actions=0, defensif=0, total=0;
+    for(var k in EQUITY_FRACTION){
+      var v=holdingEur(k); if(!v) continue;
+      var eq=v*EQUITY_FRACTION[k];
+      actions+=eq; defensif+=v-eq; total+=v;
+    }
+    defensif+=FONDS_EUROS; total+=FONDS_EUROS;   // fonds euros = 100% defensif
+    var euroEqEquilibre = valFund("QS0009080746")*0.25;  // poche MSCI EMU du fonds Equilibre
+    var pAct = total>0? actions/total : 0;
+    var drift = pAct - TARGET_ACTIONS;
+    var inBand = Math.abs(drift) <= BANDE;
+    var moveEur = Math.abs(drift)*total;
+    var gw=0, ge=0, gm=0;
+    for(var g in GEO_EQUITY){
+      var ve=holdingEur(g)*(EQUITY_FRACTION[g]||0); if(!ve) continue;
+      gw+=ve*GEO_EQUITY[g].world; ge+=ve*GEO_EQUITY[g].euro; gm+=ve*GEO_EQUITY[g].em;
+    }
+    var geoTot=(gw+ge+gm)||1;
+    var gwP=gw/geoTot*100, geP=ge/geoTot*100, gmP=gm/geoTot*100;
+    var emMove=TARGET_EM*actions - gm;
+    var geoHtml=
+      '<div class="geo"><div class="meta">Repartition des actions (par indice) : '
+      +'<span style="color:#5e9eff">Monde dev. '+gwP.toFixed(0)+'%</span> - '
+      +'<span style="color:#ffd479">Zone euro '+geP.toFixed(0)+'%</span> - '
+      +'<span style="color:#ff6482">Emergents '+gmP.toFixed(0)+'%</span></div>'
+      +'<div class="barg"><div class="w" style="width:'+gwP.toFixed(1)+'%"></div><div class="e" style="width:'+geP.toFixed(1)+'%"></div><div class="m" style="width:'+gmP.toFixed(1)+'%"></div></div>'
+      +'<div class="meta gap">Emergents : '+eur(gm)+' ('+gmP.toFixed(0)+'%). Pour viser '+(TARGET_EM*100).toFixed(0)+'% de la poche actions : basculer ~'+eur(Math.max(0,emMove))+' depuis le World.</div></div>';
+    var eqW=(pAct*100).toFixed(1), dfW=((1-pAct)*100).toFixed(1);
+    var tgtLeft=(TARGET_ACTIONS*100).toFixed(1);
+    var sig = inBand
+      ? '<span class="sig-ok">Dans la bande (cible '+(TARGET_ACTIONS*100).toFixed(0)+'/'+((1-TARGET_ACTIONS)*100).toFixed(0)+', +/- '+(BANDE*100).toFixed(0)+' pts)</span>'
+      : '<span class="sig-ko">Reequilibrage suggere : '+(drift>0?'alleger':'renforcer')+' les actions d environ '+eur(moveEur)+'</span>';
+    document.getElementById("synth").innerHTML=
+      '<div class="synth"><div class="lbl">Patrimoine consolide (PEG + PEA + AV)</div>'
+      +'<div class="big">'+eur(total)+'</div>'
+      +'<div class="meta">Actions '+eqW+'%  -  Defensif '+dfW+'%  -  ecart cible '+(drift>=0?'+':'')+(drift*100).toFixed(1)+' pts</div>'
+      +'<div class="bar"><div class="eq" style="width:'+eqW+'%"></div><div class="df" style="width:'+dfW+'%"></div><div class="tgt" style="left:'+tgtLeft+'%"></div></div>'
+      +'<div class="legend2"><span style="color:#30d158">Actions '+eur(actions)+'</span><span style="color:#0a84ff">Defensif '+eur(defensif)+'</span></div>'
+      +'<div class="meta" style="margin-top:6px">Dont actions zone euro (poche MSCI EMU de l Equilibre) : ~'+eur(euroEqEquilibre)+'</div>'
+      +'<div class="meta" style="margin-top:4px">'+sig+'</div>'+geoHtml+'</div>';
+  })();
 
   document.getElementById("scaleNote").innerHTML='<div class="scale-note">Courbes base 100, echelle commune '+gmin.toFixed(1)+'-'+gmax.toFixed(1)+'. j=jour, 1m=1 mois, tot=depuis debut.</div>';
 }
