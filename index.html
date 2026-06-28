@@ -58,6 +58,31 @@
   .chart-readout .v { font-size:19px; font-weight:800; color:#fff; }
   .chart-readout .d { font-size:12px; color:#8e8e93; margin-top:2px; }
   .chart-meta { text-align:center; font-size:11px; color:#636366; padding-bottom:4px; }
+
+  /* --- Indicateur de progression du cumul --- */
+  .synth .prog { display:inline-flex; align-items:baseline; gap:6px; margin-top:6px; font-size:13px; cursor:pointer; }
+  .synth .prog .pct { font-size:18px; font-weight:800; }
+  .synth .prog .eurd { font-size:12px; }
+  .synth .prog .since { font-size:11px; color:#9fb6cf; }
+  .synth .prog .tap { font-size:10px; color:#7fa6d6; margin-left:2px; }
+  .prog-up { color:#5aff9a; }
+  .prog-down { color:#ff6b62; }
+
+  /* --- Bouton comparateur + legende multi-courbes --- */
+  .compare { display:block; width:calc(100% - 8px); margin:14px 4px 0; background:#1c2740; color:#7fb0ff; border:1px solid #2a3a5e; border-radius:12px; padding:11px 16px; font-size:14px; font-weight:700; }
+  .chart-legend { display:flex; flex-wrap:wrap; gap:6px; padding:6px 4px 2px; max-height:34vh; overflow-y:auto; }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:#1c1c1e; border:1px solid #2c2c2e; border-radius:16px; padding:5px 10px; font-size:12px; color:#e5e5ea; }
+  .chip .dot { width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+  .chip.off { opacity:.34; }
+  .chip.off .nm2 { text-decoration:line-through; }
+  .legend-tools { display:flex; gap:8px; padding:4px 4px 0; }
+  .legend-tools button { background:#2c2c2e; color:#0a84ff; border:none; border-radius:9px; padding:5px 12px; font-size:12px; font-weight:600; }
+  .multi-read { text-align:left; font-size:12px; color:#c7c7cc; padding:6px 8px 2px; max-height:24vh; overflow-y:auto; }
+  .multi-read .mr-date { text-align:center; font-size:13px; font-weight:700; color:#fff; margin-bottom:4px; }
+  .multi-read .mr-row { display:flex; justify-content:space-between; gap:10px; padding:1px 0; }
+  .multi-read .mr-row .mr-nm { display:flex; align-items:center; gap:6px; min-width:0; }
+  .multi-read .mr-row .mr-nm .dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .multi-read .mr-row .mr-nm span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -78,6 +103,7 @@
   <div id="av"></div>
 
   <div id="scaleNote"></div>
+  <button class="compare" onclick="openMultiChart()">Comparer les courbes (base 100)</button>
   <button class="refresh" onclick="loadAll()">Actualiser</button>
 
   <!-- Modal plein ecran pour un graphique detaille -->
@@ -87,6 +113,11 @@
       <button class="chart-close" id="chartClose">&#10005;</button>
     </div>
     <div class="chart-meta" id="chartMeta"></div>
+    <div class="legend-tools" id="legendTools" style="display:none">
+      <button onclick="multiSetAll(true)">Tout</button>
+      <button onclick="multiSetAll(false)">Aucun</button>
+    </div>
+    <div class="chart-legend" id="chartLegend" style="display:none"></div>
     <div class="chart-container" id="chartContainer"></div>
     <div class="chart-readout" id="chartReadout">Glisse le doigt sur le graphique pour lire une valeur</div>
   </div>
@@ -147,6 +178,46 @@ let allCharts=[]; // registre des series pour la modale plein ecran
 
 function eur(v){ return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR"; }
 function qtyOf(k){ return QUANTITES[k] || 0; }
+
+// Palette pour le comparateur multi-courbes
+const PALETTE=["#0a84ff","#30d158","#bf5af2","#ff9f0a","#ff453a","#5e5ce6","#64d2ff","#ffd60a","#ff6482","#32d74b","#5ac8fa","#c0a0ff"];
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+// Construit la serie temporelle du patrimoine consolide (somme qte*VL + fonds euros),
+// en alignant toutes les sources sur un axe de dates commun (remplissage avant/arriere).
+function buildTotalSeries(data, hist, yres){
+  const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
+  for(const isin in data){
+    const f=data[isin];
+    if(f.category!=="PEG" && f.category!=="AV") continue;
+    const q=qtyOf(isin); if(!q) continue;
+    const h=hist[isin]||[];
+    if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return q*e.value;}) }); }
+    else if(f.value!=null){ series.push({ dates:[todayStr()], vals:[q*f.value] }); }
+  }
+  ["AIR.PA","WPEA.PA","CC4.PA"].forEach(function(sym){
+    const y=yres[sym], q=qtyOf(sym);
+    if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c){return q*c;}) }); }
+  });
+  if(!series.length) return null;
+  const dset={};
+  series.forEach(function(s){ s.dates.forEach(function(d){ dset[d]=1; }); });
+  const dates=Object.keys(dset).sort();
+  if(!dates.length) return null;
+  const values=dates.map(function(){ return FONDS_EUROS; }); // fonds euros = constante a chaque date
+  series.forEach(function(s){
+    const m={}; for(let i=0;i<s.dates.length;i++) m[s.dates[i]]=s.vals[i];
+    let firstKnown=null;
+    for(let i=0;i<dates.length;i++){ if(m[dates[i]]!=null){ firstKnown=m[dates[i]]; break; } }
+    let last=null;
+    for(let i=0;i<dates.length;i++){
+      if(m[dates[i]]!=null) last=m[dates[i]];
+      const v=(last!=null)?last:firstKnown;
+      if(v!=null) values[i]+=v;
+    }
+  });
+  return { dates:dates, values:values };
+}
 
 function toBase100(values){
   if(!values || values.length<2 || !values[0]) return null;
@@ -307,6 +378,25 @@ async function loadAll(){
     '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
     +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
 
+  // --- Patrimoine consolide : serie historique + indicateur de progression ---
+  let totalChartIdx=-1, progHtml="";
+  const totalSeries=buildTotalSeries(data,hist,yres);
+  if(totalSeries && totalSeries.values.length>=2){
+    const tv=totalSeries.values, td=totalSeries.dates, n=tv.length;
+    totalChartIdx=allCharts.length;
+    allCharts.push({label:"Patrimoine total", dates:td, values:tv, up:(tv[n-1]>=tv[0]), unit:"EUR", isTotal:true});
+    const totPct=(tv[n-1]-tv[0])/tv[0]*100;
+    const totEur=tv[n-1]-tv[0];
+    const cl=totPct>=0?"prog-up":"prog-down";
+    const sg=totPct>=0?"+":"";
+    progHtml=
+      '<div class="prog" onclick="openFullChart('+totalChartIdx+')">'
+      +'<span class="pct '+cl+'">'+sg+totPct.toFixed(2)+'%</span>'
+      +'<span class="eurd '+cl+'">'+sg+eur(totEur)+'</span>'
+      +'<span class="since">depuis le '+fmtDate(td[0])+'</span>'
+      +'<span class="tap">&#9654; voir la courbe</span></div>';
+  }
+
   // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
@@ -347,6 +437,7 @@ async function loadAll(){
     document.getElementById("synth").innerHTML=
       '<div class="synth"><div class="lbl">Patrimoine consolide (PEG + PEA + AV)</div>'
       +'<div class="big">'+eur(total)+'</div>'
+      +progHtml
       +'<div class="meta">Actions '+eqW+'%  -  Defensif '+dfW+'%  -  ecart cible '+(drift>=0?'+':'')+(drift*100).toFixed(1)+' pts</div>'
       +'<div class="bar"><div class="eq" style="width:'+eqW+'%"></div><div class="df" style="width:'+dfW+'%"></div><div class="tgt" style="left:'+tgtLeft+'%"></div></div>'
       +'<div class="legend2"><span style="color:#30d158">Actions '+eur(actions)+'</span><span style="color:#0a84ff">Defensif '+eur(defensif)+'</span></div>'
@@ -366,9 +457,24 @@ function fmtDate(s){
   const p=s.split("-");
   return p.length===3 ? p[2]+"/"+p[1] : s;
 }
+// Liaison tactile partagee entre le mode simple et le mode comparatif
+let activeShowAt=null, chartPointerBound=false;
+function bindChartPointer(){
+  if(chartPointerBound) return;
+  const cont=document.getElementById("chartContainer");
+  function ptr(e){ if(!activeShowAt) return; const p=(e.touches&&e.touches[0])?e.touches[0]:e; activeShowAt(p.clientX); }
+  cont.addEventListener("pointerdown", ptr);
+  cont.addEventListener("pointermove", function(e){ if(e.buttons||e.pressure>0||e.pointerType==="touch") ptr(e); });
+  cont.addEventListener("touchstart", ptr, {passive:true});
+  cont.addEventListener("touchmove", ptr, {passive:true});
+  chartPointerBound=true;
+}
+
 function openFullChart(idx){
   const d=allCharts[idx];
   if(!d) return;
+  document.getElementById("legendTools").style.display="none";
+  document.getElementById("chartLegend").style.display="none";
   document.getElementById("chartTitle").textContent=d.label;
   document.getElementById("chartModal").style.display="flex";
   document.getElementById("chartReadout").innerHTML="Glisse le doigt sur le graphique pour lire une valeur";
@@ -378,6 +484,123 @@ function closeFullChart(){
   document.getElementById("chartModal").style.display="none";
 }
 document.getElementById("chartClose").addEventListener("click", closeFullChart);
+
+// =======================================================
+//  COMPARATEUR : toutes les courbes superposees en base 100
+// =======================================================
+let multi={ items:[], dates:[], series100:[], visible:[] };
+
+function openMultiChart(){
+  // series exploitables (au moins 2 points)
+  const items=allCharts.filter(function(c){ return c.values && c.values.length>=2; });
+  if(items.length<1){ return; }
+  // axe de dates commun
+  const dset={};
+  items.forEach(function(c){ (c.dates||[]).forEach(function(d){ dset[d]=1; }); });
+  const dates=Object.keys(dset).sort();
+  // chaque serie : remplissage avant/arriere sur l'axe commun, puis base 100
+  const series100=items.map(function(c){
+    const m={}; for(let i=0;i<c.dates.length;i++) m[c.dates[i]]=c.values[i];
+    let firstKnown=null;
+    for(let i=0;i<dates.length;i++){ if(m[dates[i]]!=null){ firstKnown=m[dates[i]]; break; } }
+    const aligned=[]; let last=null;
+    for(let i=0;i<dates.length;i++){
+      if(m[dates[i]]!=null) last=m[dates[i]];
+      aligned.push((last!=null)?last:firstKnown);
+    }
+    const base=aligned[0]||1;
+    return aligned.map(function(v){ return v/base*100; });
+  });
+  multi={ items:items, dates:dates, series100:series100, visible:items.map(function(){return true;}) };
+
+  document.getElementById("chartTitle").textContent="Comparatif base 100";
+  document.getElementById("chartMeta").textContent=
+    items.length+" courbes - du "+fmtDate(dates[0])+" au "+fmtDate(dates[dates.length-1])+" - base 100 = depart";
+  document.getElementById("legendTools").style.display="flex";
+  document.getElementById("chartLegend").style.display="flex";
+  document.getElementById("chartReadout").innerHTML='<div class="multi-read">Glisse le doigt pour comparer les valeurs a une date</div>';
+  document.getElementById("chartModal").style.display="flex";
+  renderLegend();
+  drawMultiChart();
+}
+function renderLegend(){
+  const box=document.getElementById("chartLegend");
+  box.innerHTML=multi.items.map(function(c,i){
+    const col=PALETTE[i%PALETTE.length];
+    return '<div class="chip '+(multi.visible[i]?"":"off")+'" onclick="multiToggle('+i+')">'
+      +'<span class="dot" style="background:'+col+'"></span><span class="nm2">'+c.label+'</span></div>';
+  }).join("");
+}
+function multiToggle(i){ multi.visible[i]=!multi.visible[i]; renderLegend(); drawMultiChart(); }
+function multiSetAll(v){ multi.visible=multi.visible.map(function(){return v;}); renderLegend(); drawMultiChart(); }
+
+function drawMultiChart(){
+  const cont=document.getElementById("chartContainer");
+  cont.innerHTML="";
+  const dates=multi.dates, n=dates.length;
+  if(!n){ return; }
+  const W=cont.clientWidth||window.innerWidth, H=cont.clientHeight||300;
+  const padL=40, padR=10, padT=12, padB=26;
+  // bornes Y sur les seules courbes visibles
+  let ymin=Infinity, ymax=-Infinity;
+  multi.series100.forEach(function(s,i){
+    if(!multi.visible[i]) return;
+    s.forEach(function(v){ if(v<ymin)ymin=v; if(v>ymax)ymax=v; });
+  });
+  if(!isFinite(ymin)||!isFinite(ymax)){ ymin=95; ymax=105; }
+  if(ymin===ymax){ ymin-=1; ymax+=1; }
+  const yp=(ymax-ymin)*0.08; ymin-=yp; ymax+=yp;
+  const xOf=function(i){ return padL+(n<=1?0:i*(W-padL-padR)/(n-1)); };
+  const yOf=function(v){ return H-padB-(v-ymin)/(ymax-ymin)*(H-padT-padB); };
+
+  // grille Y (3 lignes) + ligne 100
+  let grid="";
+  for(let k=0;k<=2;k++){
+    const v=ymin+(ymax-ymin)*k/2, y=yOf(v).toFixed(1);
+    grid+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#2c2c2e" stroke-width="1"/>'
+      +'<text x="4" y="'+(parseFloat(y)+4)+'" font-size="11" fill="#8e8e93">'+v.toFixed(1)+'</text>';
+  }
+  if(ymin<=100&&ymax>=100){ const y=yOf(100).toFixed(1); grid+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#48484a" stroke-width="1" stroke-dasharray="3,3"/>'; }
+  // axe X (dates)
+  let xAxis=""; const nT=Math.min(5,n);
+  for(let k=0;k<nT;k++){ const i=Math.round(k*(n-1)/(nT-1||1)); xAxis+='<text x="'+xOf(i).toFixed(1)+'" y="'+(H-8)+'" font-size="11" fill="#8e8e93" text-anchor="middle">'+fmtDate(dates[i])+'</text>'; }
+  // polylignes
+  let lines="";
+  multi.series100.forEach(function(s,idx){
+    if(!multi.visible[idx]) return;
+    const col=PALETTE[idx%PALETTE.length];
+    const pts=s.map(function(v,i){ return xOf(i).toFixed(1)+","+yOf(v).toFixed(1); }).join(" ");
+    lines+='<polyline fill="none" stroke="'+col+'" stroke-width="'+(multi.items[idx].isTotal?3:1.8)+'" points="'+pts+'" opacity="0.95"/>';
+  });
+  cont.innerHTML=
+    '<svg id="multiSvg" width="'+W+'" height="'+H+'" style="display:block;touch-action:none">'
+    +grid+lines+xAxis
+    +'<g id="mCross" style="display:none"><line id="mLine" y1="'+padT+'" y2="'+(H-padB)+'" stroke="#8e8e93" stroke-width="1" stroke-dasharray="3,3"/></g>'
+    +'</svg>';
+
+  function showAt(clientX){
+    const rect=cont.getBoundingClientRect();
+    const x=Math.max(padL,Math.min(W-padR,clientX-rect.left));
+    let i=Math.round((x-padL)/((W-padL-padR)/(n-1||1)));
+    i=Math.max(0,Math.min(n-1,i));
+    const cx=xOf(i);
+    const g=document.getElementById("mCross"); g.style.display="block";
+    document.getElementById("mLine").setAttribute("x1",cx); document.getElementById("mLine").setAttribute("x2",cx);
+    let rows="";
+    multi.items.forEach(function(c,k){
+      if(!multi.visible[k]) return;
+      const v=multi.series100[k][i], col=PALETTE[k%PALETTE.length];
+      const dv=v-100, sg=dv>=0?"+":"", cl=dv>=0?"prog-up":"prog-down";
+      rows+='<div class="mr-row"><span class="mr-nm"><span class="dot" style="background:'+col+'"></span><span>'+c.label+'</span></span>'
+        +'<span class="'+cl+'">'+v.toFixed(1)+' ('+sg+dv.toFixed(1)+'%)</span></div>';
+    });
+    document.getElementById("chartReadout").innerHTML=
+      '<div class="multi-read"><div class="mr-date">'+dates[i]+'</div>'+(rows||'<div class="mr-row">Aucune courbe selectionnee</div>')+'</div>';
+  }
+  function ptr(e){ const p=(e.touches&&e.touches[0])?e.touches[0]:e; showAt(p.clientX); }
+  activeShowAt=showAt; bindChartPointer();
+  showAt(xOf(n-1)+cont.getBoundingClientRect().left);
+}
 
 function drawFullChart(d){
   const cont=document.getElementById("chartContainer");
@@ -446,14 +669,7 @@ function drawFullChart(d){
     document.getElementById("chartReadout").innerHTML=
       '<div class="v">'+valTxt+(d.unit?" "+d.unit:"")+'</div><div class="d">'+dates[i]+'</div>';
   }
-  function ptr(e){
-    const p=(e.touches&&e.touches[0])?e.touches[0]:e;
-    showAt(p.clientX);
-  }
-  cont.addEventListener("pointerdown", ptr);
-  cont.addEventListener("pointermove", function(e){ if(e.buttons||e.pressure>0||e.pointerType==="touch") ptr(e); });
-  cont.addEventListener("touchstart", ptr, {passive:true});
-  cont.addEventListener("touchmove", ptr, {passive:true});
+  activeShowAt=showAt; bindChartPointer();
   // valeur initiale = dernier point
   showAt(xOf(n-1)+cont.getBoundingClientRect().left);
 }
