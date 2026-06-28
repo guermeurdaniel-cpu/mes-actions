@@ -184,7 +184,7 @@ const PALETTE=["#0a84ff","#30d158","#bf5af2","#ff9f0a","#ff453a","#5e5ce6","#64d
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 // Construit la serie temporelle du patrimoine consolide (somme qte*VL + fonds euros),
-// en alignant toutes les sources sur un axe de dates commun (remplissage avant/arriere).
+// limitee a la fenetre reellement enregistree (report de la derniere VL connue, jamais de reconstruction du passe).
 function buildTotalSeries(data, hist, yres){
   const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
   for(const isin in data){
@@ -200,20 +200,27 @@ function buildTotalSeries(data, hist, yres){
     if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c){return q*c;}) }); }
   });
   if(!series.length) return null;
+  // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
+  // a etre enregistree -> aucune valeur reconstruite vers le passe (pas de back-fill).
+  let startDate=null;
+  series.forEach(function(s){
+    const fd=s.dates.slice().sort()[0];
+    if(startDate===null || fd>startDate) startDate=fd;
+  });
   const dset={};
-  series.forEach(function(s){ s.dates.forEach(function(d){ dset[d]=1; }); });
+  series.forEach(function(s){ s.dates.forEach(function(d){ if(d>=startDate) dset[d]=1; }); });
   const dates=Object.keys(dset).sort();
   if(!dates.length) return null;
   const values=dates.map(function(){ return FONDS_EUROS; }); // fonds euros = constante a chaque date
   series.forEach(function(s){
     const m={}; for(let i=0;i<s.dates.length;i++) m[s.dates[i]]=s.vals[i];
-    let firstKnown=null;
-    for(let i=0;i<dates.length;i++){ if(m[dates[i]]!=null){ firstKnown=m[dates[i]]; break; } }
+    // valeur reelle la plus recente <= startDate (toujours une donnee enregistree, jamais inventee)
+    const sd=s.dates.slice().sort();
     let last=null;
+    for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
     for(let i=0;i<dates.length;i++){
-      if(m[dates[i]]!=null) last=m[dates[i]];
-      const v=(last!=null)?last:firstKnown;
-      if(v!=null) values[i]+=v;
+      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte la derniere VL connue
+      if(last!=null) values[i]+=last;
     }
   });
   return { dates:dates, values:values };
