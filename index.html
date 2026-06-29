@@ -46,6 +46,8 @@
   .cb-env { display:flex; align-items:baseline; gap:8px; font-size:12px; font-weight:700; color:#e8e8ff; margin-top:7px; }
   .cb-line { display:flex; align-items:baseline; gap:8px; font-size:11px; color:#9aa0a6; padding-left:14px; margin-top:2px; }
   .cb-name, .cb-lbl { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cb-pct { flex:0 0 62px; text-align:right; font-variant-numeric:tabular-nums; }
+  .cb-eur { flex:0 0 96px; text-align:right; font-variant-numeric:tabular-nums; opacity:.72; }
   .cb-foot { font-size:10px; color:#636366; margin-top:8px; }
   .barg { height:12px; border-radius:6px; overflow:hidden; display:flex; background:#1c1c1e; margin:6px 0 4px; }
   .barg .w { background:#5e9eff; height:100%; }
@@ -148,6 +150,28 @@ const QUANTITES = {
 const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
 const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
 
+// --- Prix de revient (PRU) par part + date de reference commune ---
+// Tout (cumul, courbe, PMV) est ancre au 16/06/2026. Pour les fonds PEG sans PRU reel,
+// la valeur de depart figee est la VL du 16/06. Ligne absente de PRU -> repli 1re VL enregistree.
+const REF_DATE = "2026-06-16";
+const PRU = {
+  "WPEA.PA":      6.78,
+  "PAASI.PA":     40.54,
+  // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
+  "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
+  "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
+  "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
+  "FR0011408798": 10884.88,    // Amundi Euro Liquidity-Rated
+  "FR0010149120": 1924.08,     // Carmignac Securite
+  "CC4.PA":       226.55       // Amundi Euro Corporate SRI ETF
+};
+// Enveloppes (sert au detail PMV et au cumul)
+const ENVELOPPES = [
+  {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
+  {name:"PEA", keys:["WPEA.PA","PAASI.PA"]},
+  {name:"AV",  keys:["FR0011408798","FR0010149120","CC4.PA"]}
+];
+
 // --- Synthese allocation actions / defensif : parametres ---
 const EQ_EQUILIBRE   = 0.50;   // part ACTIONS du fonds Amundi Label Equilibre ESR (bande de gestion 35-65%)
 const TARGET_ACTIONS = 0.70;   // cible actions du patrimoine consolide
@@ -192,7 +216,7 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 // Construit la serie temporelle du patrimoine consolide (somme qte*VL + fonds euros),
 // limitee a la fenetre reellement enregistree (report de la derniere VL connue, jamais de reconstruction du passe).
-function buildTotalSeries(data, hist, yres){
+function buildTotalSeries(data, hist, yres, costBasis){
   const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
   for(const isin in data){
     const f=data[isin];
@@ -230,6 +254,12 @@ function buildTotalSeries(data, hist, yres){
       if(last!=null) values[i]+=last;
     }
   });
+  // Ancre au 16/06 : on prefixe la serie par le cout de revient total (capital investi) a REF_DATE,
+  // de sorte que la courbe parte du montant investi et que sa progression reflete la PMV.
+  if(costBasis!=null && isFinite(costBasis) && costBasis>0 && (!dates.length || dates[0]>REF_DATE)){
+    dates.unshift(REF_DATE);
+    values.unshift(costBasis);
+  }
   return { dates:dates, values:values };
 }
 
@@ -385,41 +415,8 @@ async function loadAll(){
     '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
     +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
 
-  // --- Patrimoine consolide : serie historique + indicateur de progression ---
-  let totalChartIdx=-1, progHtml="";
-  const totalSeries=buildTotalSeries(data,hist,yres);
-  if(totalSeries && totalSeries.values.length>=2){
-    const tv=totalSeries.values, td=totalSeries.dates, n=tv.length;
-    totalChartIdx=allCharts.length;
-    allCharts.push({label:"Patrimoine total", dates:td, values:tv, up:(tv[n-1]>=tv[0]), unit:"EUR", isTotal:true});
-    const totPct=(tv[n-1]-tv[0])/tv[0]*100;
-    const totEur=tv[n-1]-tv[0];
-    const cl=totPct>=0?"prog-up":"prog-down";
-    const sg=totPct>=0?"+":"";
-    progHtml=
-      '<div class="prog" onclick="openFullChart('+totalChartIdx+')">'
-      +'<span class="pct '+cl+'">'+sg+totPct.toFixed(2)+'%</span>'
-      +'<span class="eurd '+cl+'">'+sg+eur(totEur)+'</span>'
-      +'<span class="since">depuis le '+fmtDate(td[0])+'</span>'
-      +'<span class="tap">&#9654; voir la courbe</span></div>';
-  }
-
-  // --- Plus / moins-value par ligne (depuis le PRU), % rapporte au total du jour ---
-  // PRU = prix de revient moyen par part. Pour les fonds PEG sans PRU reel, la valeur
-  // de depart est figee au 16/06/2026. Repli (ligne absente du tableau) : 1re VL enregistree.
-  let contribHtml="";
-  (function(){
-    const PRU = {
-      "WPEA.PA":      6.78,
-      "PAASI.PA":     40.54,
-      // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
-      "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
-      "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
-      "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
-      "FR0011408798": 10884.88,    // Amundi Euro Liquidity-Rated
-      "FR0010149120": 1924.08,     // Carmignac Securite
-      "CC4.PA":       226.55       // Amundi Euro Corporate SRI ETF
-    };
+  // --- Plus / moins-value (PRU), ancree au 16/06 : sert au cumul rouge, au detail et a la courbe ---
+  function pmvCompute(){
     function curVal(k){
       const q = yres[k] && yres[k].q;
       if(q) return qtyOf(k)*q.price;
@@ -440,46 +437,66 @@ async function loadAll(){
       if(data[k] && data[k].label) return data[k].label;
       return k;
     }
-    const ENV = [
-      {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
-      {name:"PEA", keys:["WPEA.PA","PAASI.PA"]},
-      {name:"AV",  keys:["FR0011408798","FR0010149120","CC4.PA"]}
-    ];
-    // Total du jour = valeur actuelle de toutes les lignes + fonds euros
-    let totDay=FONDS_EUROS;
-    ENV.forEach(function(env){ env.keys.forEach(function(k){ totDay+=curVal(k); }); });
-    if(totDay>0){
-      function pct(g){ const p=g/totDay*100; const s=p>=0?"+":""; return '<span class="'+(p>=0?"up":"down")+'">'+s+p.toFixed(2)+'%</span>'; }
-      function de(g){ const s=g>=0?"+":""; return '<span class="'+(g>=0?"up":"down")+'" style="opacity:.7">'+s+eur(g)+'</span>'; }
-      let body="", totGain=0;
-      ENV.forEach(function(env){
-        let eGain=0; const lines=[];
-        env.keys.forEach(function(k){
-          const v=curVal(k); if(v<=0) return;
-          const g=v-costVal(k); eGain+=g;
-          lines.push({label:lblOf(k), g:g});
-        });
-        if(env.name==="AV"){                                   // fonds euros : gain = valeur - verse
-          const feGain=FONDS_EUROS-FONDS_EUROS_VERSE;
-          eGain+=feGain; lines.push({label:"Fonds euros", g:feGain});
-        }
-        totGain+=eGain;
-        if(lines.length){
-          body+='<div class="cb-env"><span class="cb-name">'+env.name+'</span>'+pct(eGain)+de(eGain)+'</div>';
-          lines.forEach(function(l){
-            body+='<div class="cb-line"><span class="cb-lbl">'+l.label+'</span>'+pct(l.g)+de(l.g)+'</div>';
-          });
-        }
+    let totDay=FONDS_EUROS, totCost=FONDS_EUROS_VERSE, totGain=0;
+    const envs=[];
+    ENVELOPPES.forEach(function(env){
+      let eGain=0; const lines=[];
+      env.keys.forEach(function(k){
+        const v=curVal(k); if(v<=0) return;
+        const c=costVal(k); const g=v-c;
+        totDay+=v; totCost+=c; eGain+=g;
+        lines.push({label:lblOf(k), g:g});
       });
-      const totPct=totGain/totDay*100, sg=totPct>=0?"+":"";
-      contribHtml=
-        '<div class="contrib"><div class="cb-head">Plus / moins-value : '
-        +'<span class="'+(totPct>=0?"up":"down")+'">'+sg+totPct.toFixed(2)+'%</span> '
-        +'<span style="opacity:.7">('+(totGain>=0?"+":"")+eur(totGain)+')</span></div>'
-        +body
-        +'<div class="cb-foot">Gain / perte par ligne depuis le PRU, % rapporte au total du jour ; somme = PMV totale.</div></div>';
-    }
-  })();
+      if(env.name==="AV"){                                   // fonds euros : gain = valeur - verse
+        const feGain=FONDS_EUROS-FONDS_EUROS_VERSE;
+        eGain+=feGain; lines.push({label:"Fonds euros", g:feGain});
+      }
+      totGain+=eGain;
+      if(lines.length) envs.push({name:env.name, g:eGain, lines:lines});
+    });
+    return {totDay:totDay, totCost:totCost, totGain:totGain, envs:envs};
+  }
+  const pmv=pmvCompute();
+
+  // Detail par ligne, colonnes % et EUR alignees (classes .cb-pct / .cb-eur)
+  let contribHtml="";
+  if(pmv.totDay>0){
+    function pct(g){ const p=g/pmv.totDay*100; const s=p>=0?"+":""; return '<span class="cb-pct '+(p>=0?"up":"down")+'">'+s+p.toFixed(2)+'%</span>'; }
+    function de(g){ const s=g>=0?"+":""; return '<span class="cb-eur '+(g>=0?"up":"down")+'">'+s+eur(g)+'</span>'; }
+    let body="";
+    pmv.envs.forEach(function(env){
+      body+='<div class="cb-env"><span class="cb-name">'+env.name+'</span>'+pct(env.g)+de(env.g)+'</div>';
+      env.lines.forEach(function(l){
+        body+='<div class="cb-line"><span class="cb-lbl">'+l.label+'</span>'+pct(l.g)+de(l.g)+'</div>';
+      });
+    });
+    contribHtml=
+      '<div class="contrib"><div class="cb-head">Detail par ligne (PMV depuis le 16/06)</div>'
+      +body
+      +'<div class="cb-foot">Gain / perte par ligne depuis le PRU, % rapporte au total du jour ; somme = PMV totale.</div></div>';
+  }
+
+  // --- Patrimoine consolide : courbe ancree au 16/06 (cout de revient) + cumul rouge = PMV ---
+  let totalChartIdx=-1, progHtml="";
+  const totalSeries=buildTotalSeries(data,hist,yres,pmv.totCost);
+  if(totalSeries && totalSeries.values.length>=2){
+    const tv=totalSeries.values, td=totalSeries.dates, n=tv.length;
+    totalChartIdx=allCharts.length;
+    allCharts.push({label:"Patrimoine total", dates:td, values:tv, up:(tv[n-1]>=tv[0]), unit:"EUR", isTotal:true});
+  }
+  // Le cumul affiche en haut = la PMV (calcul PRU), pas la variation brute de la courbe.
+  if(pmv.totDay>0){
+    const totPct=pmv.totGain/pmv.totDay*100;
+    const cl=pmv.totGain>=0?"prog-up":"prog-down";
+    const sg=pmv.totGain>=0?"+":"";
+    const clickable=(totalChartIdx>=0)?' onclick="openFullChart('+totalChartIdx+')"':'';
+    progHtml=
+      '<div class="prog"'+clickable+'>'
+      +'<span class="pct '+cl+'">'+sg+totPct.toFixed(2)+'%</span>'
+      +'<span class="eurd '+cl+'">'+sg+eur(pmv.totGain)+'</span>'
+      +'<span class="since">PMV depuis le 16/06</span>'
+      +(totalChartIdx>=0?'<span class="tap">&#9654; voir la courbe</span>':'')+'</div>';
+  }
 
   // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
   (function(){
