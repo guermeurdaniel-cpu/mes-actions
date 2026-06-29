@@ -41,6 +41,12 @@
   .legend2 { font-size:11px; color:#8e8e93; display:flex; gap:14px; flex-wrap:wrap; }
   .sig-ok { color:#9affc0; } .sig-ko { color:#ffd479; }
   .geo { margin-top:10px; }
+  .contrib { margin-top:12px; border-top:1px solid rgba(255,255,255,.08); padding-top:10px; }
+  .cb-head { font-size:12px; color:#cfe6ff; margin-bottom:4px; }
+  .cb-env { display:flex; align-items:baseline; gap:8px; font-size:12px; font-weight:700; color:#e8e8ff; margin-top:7px; }
+  .cb-line { display:flex; align-items:baseline; gap:8px; font-size:11px; color:#9aa0a6; padding-left:14px; margin-top:2px; }
+  .cb-name, .cb-lbl { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cb-foot { font-size:10px; color:#636366; margin-top:8px; }
   .barg { height:12px; border-radius:6px; overflow:hidden; display:flex; background:#1c1c1e; margin:6px 0 4px; }
   .barg .w { background:#5e9eff; height:100%; }
   .barg .e { background:#ffd479; height:100%; }
@@ -127,19 +133,20 @@
 //  PARAMETRES — modifie uniquement ici
 // =======================================================
 const QUANTITES = {
-  // PEG (fonds Amundi ESR + Airbus)
-  "QS0009080175": 1156.7167 + 941.2472,
+  // PEG (fonds Amundi ESR)
+  "QS0009080175": 1156.7167 + 941.2472,  // tranche PEG + tranche PER
   "QS0009080746": 75.4236,
   "QS0009080720": 9.4187,
-  "AIR.PA": 0,
   // Assurance vie - unites de compte
-  "FR0011408798": 0.299,
-  "FR0010149120": 1.6917,
-  "CC4.PA": 14.3676,        // ETF Amundi Euro Corporate SRI (LU1681039647)
+  "FR0011408798": 0.3049,
+  "FR0010149120": 1.6886,
+  "CC4.PA": 14.3407,        // ETF Amundi Euro Corporate SRI (LU1681039647)
   // PEA
-  "WPEA.PA": 5863
+  "WPEA.PA": 5863,
+  "PAASI.PA": 248          // ETF Amundi PEA Asie Emergente (FR0013412012)
 };
-const FONDS_EUROS = 18135;   // Assurance vie - fonds euros (valeur saisie a la main)
+const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
+const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
 
 // --- Synthese allocation actions / defensif : parametres ---
 const EQ_EQUILIBRE   = 0.50;   // part ACTIONS du fonds Amundi Label Equilibre ESR (bande de gestion 35-65%)
@@ -149,11 +156,11 @@ const EQUITY_FRACTION = {
   "QS0009080175": 1.00,          // Amundi Actions Internationales ESR (actions monde)
   "QS0009080746": EQ_EQUILIBRE,  // Amundi Label Equilibre ESR (mixte)
   "QS0009080720": 0.00,          // Amundi Label Monetaire ESR
-  "AIR.PA":       1.00,          // Airbus
   "FR0011408798": 0.00,          // Amundi Euro Liquidity-Rated
   "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
   "CC4.PA":       0.00,          // Amundi Euro Corporate SRI (oblig)
-  "WPEA.PA":      1.00           // ETF MSCI World
+  "WPEA.PA":      1.00,          // ETF MSCI World
+  "PAASI.PA":     1.00           // ETF PEA Asie Emergente (actions)
 };
 
 // --- Repartition geographique des ACTIONS (par mandat d'indice) ---
@@ -161,15 +168,15 @@ const TARGET_EM = 0.10;  // cible emergents en part de la poche actions (0.10 = 
 const GEO_EQUITY = {
   "QS0009080175": { world:1.00, euro:0.00, em:0.00 }, // benchmark MSCI World
   "QS0009080746": { world:0.50, euro:0.50, em:0.00 }, // poche actions = 1/2 World + 1/2 zone euro
-  "AIR.PA":       { world:0.00, euro:1.00, em:0.00 }, // Airbus = zone euro
-  "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }  // MSCI World
+  "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }, // MSCI World
+  "PAASI.PA":     { world:0.00, euro:0.00, em:1.00 }  // MSCI Emerging Asia (emergents)
 };
 // =======================================================
 
 // Valeurs cotees Yahoo : groupe "peg", "pea" ou "av"
 const MARKET = [
-  { symbol:"AIR.PA",  label:"Airbus",                 group:"peg" },
   { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
+  { symbol:"PAASI.PA",label:"ETF PEA Asie Emergente", group:"pea" },
   { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" }
 ];
 
@@ -195,7 +202,7 @@ function buildTotalSeries(data, hist, yres){
     if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return q*e.value;}) }); }
     else if(f.value!=null){ series.push({ dates:[todayStr()], vals:[q*f.value] }); }
   }
-  ["AIR.PA","WPEA.PA","CC4.PA"].forEach(function(sym){
+  ["WPEA.PA","PAASI.PA","CC4.PA"].forEach(function(sym){
     const y=yres[sym], q=qtyOf(sym);
     if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c){return q*c;}) }); }
   });
@@ -321,7 +328,7 @@ async function loadAll(){
   for(const isin in data){ if(data[isin].status!=="not_found") scan((hist[isin]||[]).map(function(e){return e.value;})); }
   if(!isFinite(gmin)||!isFinite(gmax)||gmin===gmax){ gmin=95; gmax=105; }
 
-  // --- PEG (fonds Amundi + Airbus) ---
+  // --- PEG (fonds Amundi ESR) ---
   const pegBox=document.getElementById("peg"); pegBox.innerHTML="";
   for(const isin in data){
     const f=data[isin]; if(f.category!=="PEG") continue;
@@ -334,18 +341,11 @@ async function loadAll(){
     } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
     pegBox.appendChild(row);
   }
-  const air=yres["AIR.PA"];
-  if(air){
-    const row=document.createElement("div"); row.className="row";
-    if(air.q){ row.innerHTML=rowYahoo({symbol:"AIR.PA",label:air.t.label,q:air.q},gmin,gmax); pegTotal += qtyOf("AIR.PA")*air.q.price; }
-    else { row.innerHTML='<div class="info"><div class="nm">Airbus</div><div class="err">'+air.err+'</div></div><svg class="spark"></svg>'; }
-    pegBox.appendChild(row);
-  }
   document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
 
   // --- PEA (ETF Monde) ---
   const refBox=document.getElementById("refs"); refBox.innerHTML="";
-  ["WPEA.PA"].forEach(function(sym){
+  ["WPEA.PA","PAASI.PA"].forEach(function(sym){
     const it=yres[sym]; if(!it) return;
     const row=document.createElement("div"); row.className="row";
     if(it.q){ row.innerHTML=rowYahoo({symbol:sym,label:it.t.label,q:it.q},gmin,gmax); peaTotal += qtyOf(sym)*it.q.price; }
@@ -404,11 +404,88 @@ async function loadAll(){
       +'<span class="tap">&#9654; voir la courbe</span></div>';
   }
 
+  // --- Plus / moins-value par ligne (depuis le PRU), % rapporte au total du jour ---
+  // PRU = prix de revient moyen par part. Pour les fonds PEG sans PRU reel, la valeur
+  // de depart est figee au 16/06/2026. Repli (ligne absente du tableau) : 1re VL enregistree.
+  let contribHtml="";
+  (function(){
+    const PRU = {
+      "WPEA.PA":      6.78,
+      "PAASI.PA":     40.54,
+      // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
+      "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
+      "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
+      "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
+      "FR0011408798": 10884.88,    // Amundi Euro Liquidity-Rated
+      "FR0010149120": 1924.08,     // Carmignac Securite
+      "CC4.PA":       226.55       // Amundi Euro Corporate SRI ETF
+    };
+    function curVal(k){
+      const q = yres[k] && yres[k].q;
+      if(q) return qtyOf(k)*q.price;
+      const f = data[k];
+      if(f && f.value!=null) return qtyOf(k)*f.value;
+      return 0;
+    }
+    function costVal(k){
+      if(PRU[k]!=null) return qtyOf(k)*PRU[k];
+      const s=(hist[k]||[]).map(function(e){return e.value;});         // repli : 1re VL enregistree
+      if(s.length) return qtyOf(k)*s[0];
+      const q=yres[k] && yres[k].q;
+      if(q && q.closes && q.closes.length) return qtyOf(k)*q.closes[0];
+      return curVal(k);                                                // dernier repli : gain nul
+    }
+    function lblOf(k){
+      if(yres[k] && yres[k].t) return yres[k].t.label;
+      if(data[k] && data[k].label) return data[k].label;
+      return k;
+    }
+    const ENV = [
+      {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
+      {name:"PEA", keys:["WPEA.PA","PAASI.PA"]},
+      {name:"AV",  keys:["FR0011408798","FR0010149120","CC4.PA"]}
+    ];
+    // Total du jour = valeur actuelle de toutes les lignes + fonds euros
+    let totDay=FONDS_EUROS;
+    ENV.forEach(function(env){ env.keys.forEach(function(k){ totDay+=curVal(k); }); });
+    if(totDay>0){
+      function pct(g){ const p=g/totDay*100; const s=p>=0?"+":""; return '<span class="'+(p>=0?"up":"down")+'">'+s+p.toFixed(2)+'%</span>'; }
+      function de(g){ const s=g>=0?"+":""; return '<span class="'+(g>=0?"up":"down")+'" style="opacity:.7">'+s+eur(g)+'</span>'; }
+      let body="", totGain=0;
+      ENV.forEach(function(env){
+        let eGain=0; const lines=[];
+        env.keys.forEach(function(k){
+          const v=curVal(k); if(v<=0) return;
+          const g=v-costVal(k); eGain+=g;
+          lines.push({label:lblOf(k), g:g});
+        });
+        if(env.name==="AV"){                                   // fonds euros : gain = valeur - verse
+          const feGain=FONDS_EUROS-FONDS_EUROS_VERSE;
+          eGain+=feGain; lines.push({label:"Fonds euros", g:feGain});
+        }
+        totGain+=eGain;
+        if(lines.length){
+          body+='<div class="cb-env"><span class="cb-name">'+env.name+'</span>'+pct(eGain)+de(eGain)+'</div>';
+          lines.forEach(function(l){
+            body+='<div class="cb-line"><span class="cb-lbl">'+l.label+'</span>'+pct(l.g)+de(l.g)+'</div>';
+          });
+        }
+      });
+      const totPct=totGain/totDay*100, sg=totPct>=0?"+":"";
+      contribHtml=
+        '<div class="contrib"><div class="cb-head">Plus / moins-value : '
+        +'<span class="'+(totPct>=0?"up":"down")+'">'+sg+totPct.toFixed(2)+'%</span> '
+        +'<span style="opacity:.7">('+(totGain>=0?"+":"")+eur(totGain)+')</span></div>'
+        +body
+        +'<div class="cb-foot">Gain / perte par ligne depuis le PRU, % rapporte au total du jour ; somme = PMV totale.</div></div>';
+    }
+  })();
+
   // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
     function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
-    function holdingEur(k){ return (k==="WPEA.PA"||k==="CC4.PA"||k==="AIR.PA")? valYahoo(k) : valFund(k); }
+    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="CC4.PA")? valYahoo(k) : valFund(k); }
     var actions=0, defensif=0, total=0;
     for(var k in EQUITY_FRACTION){
       var v=holdingEur(k); if(!v) continue;
@@ -428,14 +505,13 @@ async function loadAll(){
     }
     var geoTot=(gw+ge+gm)||1;
     var gwP=gw/geoTot*100, geP=ge/geoTot*100, gmP=gm/geoTot*100;
-    var emMove=TARGET_EM*actions - gm;
     var geoHtml=
       '<div class="geo"><div class="meta">Repartition des actions (par indice) : '
       +'<span style="color:#5e9eff">Monde dev. '+gwP.toFixed(0)+'%</span> - '
       +'<span style="color:#ffd479">Zone euro '+geP.toFixed(0)+'%</span> - '
       +'<span style="color:#ff6482">Emergents '+gmP.toFixed(0)+'%</span></div>'
       +'<div class="barg"><div class="w" style="width:'+gwP.toFixed(1)+'%"></div><div class="e" style="width:'+geP.toFixed(1)+'%"></div><div class="m" style="width:'+gmP.toFixed(1)+'%"></div></div>'
-      +'<div class="meta gap">Emergents : '+eur(gm)+' ('+gmP.toFixed(0)+'%). Pour viser '+(TARGET_EM*100).toFixed(0)+'% de la poche actions : basculer ~'+eur(Math.max(0,emMove))+' depuis le World.</div></div>';
+      +'<div class="meta gap">Emergents : '+eur(gm)+' ('+gmP.toFixed(0)+'%).</div></div>';
     var eqW=(pAct*100).toFixed(1), dfW=((1-pAct)*100).toFixed(1);
     var tgtLeft=(TARGET_ACTIONS*100).toFixed(1);
     var sig = inBand
@@ -445,6 +521,7 @@ async function loadAll(){
       '<div class="synth"><div class="lbl">Patrimoine consolide (PEG + PEA + AV)</div>'
       +'<div class="big">'+eur(total)+'</div>'
       +progHtml
+      +contribHtml
       +'<div class="meta">Actions '+eqW+'%  -  Defensif '+dfW+'%  -  ecart cible '+(drift>=0?'+':'')+(drift*100).toFixed(1)+' pts</div>'
       +'<div class="bar"><div class="eq" style="width:'+eqW+'%"></div><div class="df" style="width:'+dfW+'%"></div><div class="tgt" style="left:'+tgtLeft+'%"></div></div>'
       +'<div class="legend2"><span style="color:#30d158">Actions '+eur(actions)+'</span><span style="color:#0a84ff">Defensif '+eur(defensif)+'</span></div>'
