@@ -209,6 +209,8 @@ let allCharts=[]; // registre des series pour la modale plein ecran
 
 function eur(v){ return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR"; }
 function qtyOf(k){ return QUANTITES[k] || 0; }
+// Cout de revient d'une ligne (qte x PRU). null si pas de PRU connu -> repli sur la variation de marche.
+function lineCost(k){ return (PRU[k]!=null) ? qtyOf(k)*PRU[k] : null; }
 
 // Palette pour le comparateur multi-courbes
 const PALETTE=["#0a84ff","#30d158","#bf5af2","#ff9f0a","#ff453a","#5e5ce6","#64d2ff","#ffd60a","#ff6482","#32d74b","#5ac8fa","#c0a0ff"];
@@ -311,23 +313,26 @@ async function fetchYahoo(symbol){
 function rowYahoo(it, gmin, gmax){
   const q=it.q;
   const dayPct=(q.prev?(q.price-q.prev)/q.prev*100:null);
-  const moPct=variation(q.closes);
   const h=qtyOf(it.symbol)*q.price;
+  const cost=lineCost(it.symbol);
+  const pmvPct=(cost!=null && cost>0)? (h-cost)/cost*100 : variation(q.closes); // PMV depuis PRU, sinon repli marche
   const heldTxt=(qtyOf(it.symbol)>0)?'<span class="held">'+eur(h)+'</span>':"";
-  const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (moPct==null?0:moPct)>=0, q.cur||"");
+  const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, q.cur||"");
   return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
-    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(moPct,"1m ")+heldTxt
+    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
     +'</div></div>'+spark;
 }
 function rowFund(f, series, dates, gmin, gmax){
-  const moPct=variation(series), lc=lastChange(series);
+  const lc=lastChange(series);
   const h=qtyOf(f.isin)*f.value;
+  const cost=lineCost(f.isin);
+  const pmvPct=(cost!=null && cost>0)? (h-cost)/cost*100 : variation(series); // PMV depuis PRU, sinon repli marche
   const heldTxt=(qtyOf(f.isin)>0)?'<span class="held">'+eur(h)+'</span>':"";
   const val=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
   const oldTxt=(f.status==="ancien")?'<span style="color:#ff9f0a">ancien</span>':"";
-  const spark=sparkClickable(f.label, dates, series, toBase100(series), gmin, gmax, (moPct==null?0:moPct)>=0, "");
+  const spark=sparkClickable(f.label, dates, series, toBase100(series), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, "");
   return '<div class="info"><div class="nm">'+f.label+'</div><div class="sub">'
-    +'<span class="pr">'+val+'</span>'+oldTxt+pctSpan(lc?lc.pct:null,"j ")+pctSpan(moPct,"tot ")+heldTxt
+    +'<span class="pr">'+val+'</span>'+oldTxt+pctSpan(lc?lc.pct:null,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
     +'</div></div>'+spark;
 }
 
