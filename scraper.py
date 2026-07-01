@@ -57,14 +57,20 @@ def scrape_amundi(page, isin):
         if "Service Unavailable" in text or "Access Denied" in text:
             print("[robot]   Amundi indisponible/bloque, nouvel essai dans 15s...")
             page.wait_for_timeout(15000); continue
-        # Regex tolerante : casse libre, suffixe (C)/(D) optionnel, deux-points optionnel
-        m = re.search(r'[Vv]aleur\s+[Ll]iquidative(?:\s*\([CD]\))?\s*:?\s*([\d \u00a0]+[.,]\d{2,4})', text)
+        # Format reel (multi-lignes) :  "Valeur liquidative\nAu JJ/MM/AAAA\n39,51 €"
+        # Libelle, date et nombre sur des lignes distinctes, sans "(C)" ni ":".
+        m = re.search(
+            r'Valeur\s+liquidative\s*(?:Au\s+(\d{2}/\d{2}/\d{4})\s*)?([\d\u00a0 ]+[.,]\d{2,4})\s*€',
+            text, re.IGNORECASE)
         if m:
-            value = parse_num(m.group(1))
+            value = parse_num(m.group(2))
             nav_date = None
-            d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', text)
-            if d:
-                jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
+            if m.group(1):
+                jj,mm,aaaa = m.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
+            else:
+                d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', text)
+                if d:
+                    jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
             return value, nav_date
         print("[robot]   VL introuvable, nouvel essai dans 12s...")
         page.wait_for_timeout(12000)
