@@ -21,25 +21,44 @@ def parse_num(s):
         s = s.replace(',','.')
     return float(s)
 
+def accept_cookies(page):
+    # Franchit le bandeau de consentement (OneTrust et variantes courantes) s'il est present.
+    for sel in ["#onetrust-accept-btn-handler",
+                "button:has-text('Tout accepter')",
+                "button:has-text('Tout accepter et fermer')",
+                "button:has-text('Accepter')",
+                "button:has-text(\"J'accepte\")",
+                "button:has-text('OK')"]:
+        try:
+            b=page.query_selector(sel)
+            if b:
+                b.click(timeout=3000); page.wait_for_timeout(1200)
+                print(f"[robot]   consentement clique ({sel})")
+                return
+        except Exception:
+            pass
+
 def scrape_amundi(page, isin):
     url = f"https://www.amundi-ee.com/epargnant/product/view/{isin}"
     text = ""
-    for tentative in range(1, 5):
-        print(f"[robot] (PEG) {url}  (essai {tentative}/4)")
+    for tentative in range(1, 6):
+        print(f"[robot] (PEG) {url}  (essai {tentative}/5)")
         try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
         except Exception as e: print(f"[robot]   goto: {e}")
+        accept_cookies(page)
         try:
             page.wait_for_function(
-                "document.body && document.body.innerText.includes('Valeur Liquidative')",
+                "document.body && /valeur\\s+liquidative/i.test(document.body.innerText)",
                 timeout=25000)
         except Exception:
             print("[robot]   VL pas encore affichee...")
         page.wait_for_timeout(3000)
         text = page.inner_text("body")
-        if "Service Unavailable" in text:
-            print("[robot]   Amundi indisponible, nouvel essai dans 15s...")
+        if "Service Unavailable" in text or "Access Denied" in text:
+            print("[robot]   Amundi indisponible/bloque, nouvel essai dans 15s...")
             page.wait_for_timeout(15000); continue
-        m = re.search(r'Valeur Liquidative\s*\(C\)\s*:\s*([\d \u00a0]+[.,]\d{2,4})', text)
+        # Regex tolerante : casse libre, suffixe (C)/(D) optionnel, deux-points optionnel
+        m = re.search(r'[Vv]aleur\s+[Ll]iquidative(?:\s*\([CD]\))?\s*:?\s*([\d \u00a0]+[.,]\d{2,4})', text)
         if m:
             value = parse_num(m.group(1))
             nav_date = None
@@ -49,7 +68,7 @@ def scrape_amundi(page, isin):
             return value, nav_date
         print("[robot]   VL introuvable, nouvel essai dans 12s...")
         page.wait_for_timeout(12000)
-    print("[robot]   echec apres 4 essais, extrait:"); print((text or '')[:800])
+    print("[robot]   echec apres 5 essais, extrait:"); print((text or '')[:800])
     return None, None
 
 def scrape_abcbourse(page, url):
@@ -93,8 +112,16 @@ def last_known(history, isin):
 
 def main():
     results={}; history=load_json(HIST,{})
+    UA=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
     with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True); page=browser.new_page()
+        browser=p.chromium.launch(headless=True,
+            args=["--disable-blink-features=AutomationControlled","--no-sandbox"])
+        context=browser.new_context(user_agent=UA, locale="fr-FR",
+            timezone_id="Europe/Paris", viewport={"width":1366,"height":900})
+        # Masque le drapeau d'automatisation le plus grossier (navigator.webdriver)
+        context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+        page=context.new_page()
         for f in FONDS:
             if f["source"]=="amundi-ee": value,nav_date=scrape_amundi(page,f["isin"])
             else: value,nav_date=scrape_abcbourse(page,f["url"])
