@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-import json, re, os, datetime
-from playwright.sync_api import sync_playwright
+# Recuperation des VL sans navigateur (plus de Playwright) :
+#  - Fonds PEG (QS...) : API JSON interne Amundi EE  /product-services/fdr/share/v3/full/{ISIN}
+#                        -> champ lastNav.value (nombre) et lastNav.date (ISO AAAA-MM-JJ)
+#  - Fonds AV  (FR...) : page abcbourse.com, VL lue dans le HTML servi.
+# Run attendu : quelques secondes (aucun Chromium a installer, aucun rendu a attendre).
+import json, re, os, datetime, time
+import requests
 
 FONDS = [
-    { "isin":"QS0009080175", "label":"Amundi Actions Internationales ESR - F", "category":"PEG", "source":"amundi-ee" },
-    { "isin":"QS0009080746", "label":"Amundi Label Equilibre ESR - F",         "category":"PEG", "source":"amundi-ee" },
-    { "isin":"QS0009080720", "label":"Amundi Label Monetaire ESR - F",         "category":"PEG", "source":"amundi-ee" },
+    { "isin":"QS0009080175", "label":"Amundi Actions Internationales ESR - F", "category":"PEG", "source":"amundi-api" },
+    { "isin":"QS0009080746", "label":"Amundi Label Equilibre ESR - F",         "category":"PEG", "source":"amundi-api" },
+    { "isin":"QS0009080720", "label":"Amundi Label Monetaire ESR - F",         "category":"PEG", "source":"amundi-api" },
     { "isin":"FR0011408798", "label":"Amundi Euro Liquidity-Rated", "category":"AV", "source":"abcbourse",
       "url":"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_sFR0011408798" },
     { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV", "source":"abcbourse",
       "url":"https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120" },
 ]
 OUT = "nav.json"; HIST = "history.json"
+
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
 
 def parse_num(s):
     s = s.strip().replace('\u00a0','').replace(' ','').replace('€','')
@@ -21,79 +29,98 @@ def parse_num(s):
         s = s.replace(',','.')
     return float(s)
 
-def accept_cookies(page):
-    # Franchit le bandeau de consentement (OneTrust et variantes courantes) s'il est present.
-    for sel in ["#onetrust-accept-btn-handler",
-                "button:has-text('Tout accepter')",
-                "button:has-text('Tout accepter et fermer')",
-                "button:has-text('Accepter')",
-                "button:has-text(\"J'accepte\")",
-                "button:has-text('OK')"]:
+def http_get(url, headers, tries=3, timeout=30):
+    for t in range(1, tries+1):
         try:
-            b=page.query_selector(sel)
-            if b:
-                b.click(timeout=3000); page.wait_for_timeout(1200)
-                print(f"[robot]   consentement clique ({sel})")
-                return
-        except Exception:
-            pass
+            r = requests.get(url, headers=headers, timeout=timeout)
+            if r.status_code == 200:
+                return r
+            print(f"[http] {url} -> HTTP {r.status_code} (essai {t}/{tries})")
+        except Exception as e:
+            print(f"[http] {url} erreur: {e} (essai {t}/{tries})")
+        time.sleep(4)
+    return None
 
-def scrape_amundi(page, isin):
-    url = f"https://www.amundi-ee.com/epargnant/product/view/{isin}"
-    text = ""
-    for tentative in range(1, 6):
-        print(f"[robot] (PEG) {url}  (essai {tentative}/5)")
-        try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
-        except Exception as e: print(f"[robot]   goto: {e}")
-        accept_cookies(page)
+# --- PEG : API JSON Amundi EE ------------------------------------------------
+def find_last_nav(obj):
+    # Cherche un objet {value, date, ...} porte par une cle contenant "nav" (ex. lastNav).
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, dict) and "nav" in k.lower() and "value" in v and "date" in v:
+                return v
+        for v in obj.values():
+            r = find_last_nav(v)
+            if r: return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = find_last_nav(v)
+            if r: return r
+    return None
+
+def scrape_amundi_api(isin):
+    url = f"https://www.amundi-ee.com/product-services/fdr/share/v3/full/{isin}"
+    headers = {
+        "User-Agent": UA,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+        "Referer": f"https://www.amundi-ee.com/epargnant/product/view/{isin}",
+    }
+    print(f"[amundi] {url}")
+    r = http_get(url, headers)
+    if not r:
+        return None, None
+    try:
+        data = r.json()
+    except Exception as e:
+        print(f"[amundi]   JSON invalide: {e}")
+        return None, None
+    nav = find_last_nav(data)
+    if nav and nav.get("value") is not None:
         try:
-            page.wait_for_function(
-                "document.body && /valeur\\s+liquidative/i.test(document.body.innerText)",
-                timeout=25000)
+            value = float(nav["value"])
         except Exception:
-            print("[robot]   VL pas encore affichee...")
-        page.wait_for_timeout(3000)
-        text = page.inner_text("body")
-        if "Service Unavailable" in text or "Access Denied" in text:
-            print("[robot]   Amundi indisponible/bloque, nouvel essai dans 15s...")
-            page.wait_for_timeout(15000); continue
-        # Format reel (multi-lignes) :  "Valeur liquidative\nAu JJ/MM/AAAA\n39,51 €"
-        # Libelle, date et nombre sur des lignes distinctes, sans "(C)" ni ":".
-        m = re.search(
-            r'Valeur\s+liquidative\s*(?:Au\s+(\d{2}/\d{2}/\d{4})\s*)?([\d\u00a0 ]+[.,]\d{2,4})\s*€',
-            text, re.IGNORECASE)
-        if m:
-            value = parse_num(m.group(2))
-            nav_date = None
-            if m.group(1):
-                jj,mm,aaaa = m.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
-            else:
-                d = re.search(r'Date des donn[ée]es\s*:\s*(\d{2}/\d{2}/\d{4})', text)
-                if d:
-                    jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
-            return value, nav_date
-        print("[robot]   VL introuvable, nouvel essai dans 12s...")
-        page.wait_for_timeout(12000)
-    print("[robot]   echec apres 5 essais, extrait:"); print((text or '')[:800])
+            print(f"[amundi]   value non numerique: {nav.get('value')}")
+            return None, None
+        nav_date = nav.get("date")  # deja au format ISO AAAA-MM-JJ
+        print(f"[amundi]   value={value} date={nav_date}")
+        return value, nav_date
+    print(f"[amundi]   lastNav/value introuvable dans le JSON")
     return None, None
 
-def scrape_abcbourse(page, url):
-    print(f"[robot] (AV) {url}")
-    try: page.goto(url, wait_until="domcontentloaded", timeout=90000)
-    except Exception as e: print(f"[robot]   goto: {e}")
-    page.wait_for_timeout(5000)
-    text = page.inner_text("body")
-    value=None; nav_date=None
-    d = re.search(r'Date valorisation\s*:\s*(\d{2}/\d{2}/\d{4})', text)
+# --- AV : page HTML abcbourse ------------------------------------------------
+def html_to_text(html):
+    html = re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', html)
+    txt = re.sub(r'(?s)<[^>]+>', ' ', html)
+    txt = (txt.replace('&nbsp;', '\u00a0').replace('&euro;', '€')
+              .replace('&#8364;', '€').replace('&#160;', '\u00a0'))
+    return re.sub(r'[ \t]+', ' ', txt)
+
+def scrape_abcbourse(url):
+    headers = {
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+    }
+    print(f"[abcbourse] {url}")
+    r = http_get(url, headers)
+    if not r:
+        return None, None
+    text = html_to_text(r.text)
+    value = None; nav_date = None
+    d = re.search(r'Date valorisation\s*:?\s*(\d{2}/\d{2}/\d{4})', text)
     if d:
-        jj,mm,aaaa = d.group(1).split("/"); nav_date=f"{aaaa}-{mm}-{jj}"
-    head = text.split("Date valorisation")[0]
+        jj, mm, aaaa = d.group(1).split("/"); nav_date = f"{aaaa}-{mm}-{jj}"
+    head = text.split("Date valorisation")[0] if "Date valorisation" in text else text
     m = re.search(r'([\d\u00a0 ]+,\d{2,4})\s*EUR', head)
-    if m: value = parse_num(m.group(1))
+    if m:
+        value = parse_num(m.group(1))
     if value is None:
-        print("[robot]   VL introuvable, extrait:"); print((text or '')[:800])
+        print(f"[abcbourse]   VL introuvable")
+    else:
+        print(f"[abcbourse]   value={value} date={nav_date}")
     return value, nav_date
 
+# --- IO ----------------------------------------------------------------------
 def load_json(path, default):
     if os.path.exists(path):
         try:
@@ -118,39 +145,26 @@ def last_known(history, isin):
 
 def main():
     results={}; history=load_json(HIST,{})
-    UA=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
-    with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True,
-            args=["--disable-blink-features=AutomationControlled","--no-sandbox"])
-        context=browser.new_context(user_agent=UA, locale="fr-FR",
-            timezone_id="Europe/Paris", viewport={"width":1366,"height":900})
-        # Masque le drapeau d'automatisation le plus grossier (navigator.webdriver)
-        context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
-        page=context.new_page()
-        for f in FONDS:
-            if f["source"]=="amundi-ee": value,nav_date=scrape_amundi(page,f["isin"])
-            else: value,nav_date=scrape_abcbourse(page,f["url"])
+    for f in FONDS:
+        if f["source"]=="amundi-api": value,nav_date=scrape_amundi_api(f["isin"])
+        else:                         value,nav_date=scrape_abcbourse(f["url"])
 
-            if value is not None:
-                # Succes : valeur du jour
-                date = nav_date or datetime.date.today().isoformat()
+        if value is not None:
+            date = nav_date or datetime.date.today().isoformat()
+            results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
+                "value":value,"currency":"EUR","date":date,"status":"ok"}
+            merge_history(history,f["isin"],date,value)
+        else:
+            old_val, old_date = last_known(history, f["isin"])
+            if old_val is not None:
+                print(f"[robot]   -> reprise derniere VL connue : {old_val} ({old_date})")
                 results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                    "value":value,"currency":"EUR","date":date,"status":"ok"}
-                merge_history(history,f["isin"],date,value)
+                    "value":old_val,"currency":"EUR","date":old_date,"status":"ancien"}
             else:
-                # Echec : on reprend la derniere valeur connue dans l'historique
-                old_val, old_date = last_known(history, f["isin"])
-                if old_val is not None:
-                    print(f"[robot]   -> reprise derniere VL connue : {old_val} ({old_date})")
-                    results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                        "value":old_val,"currency":"EUR","date":old_date,"status":"ancien"}
-                else:
-                    results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                        "value":None,"currency":"EUR","date":datetime.date.today().isoformat(),"status":"not_found"}
+                results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
+                    "value":None,"currency":"EUR","date":datetime.date.today().isoformat(),"status":"not_found"}
 
-            print(f"[robot] {f['isin']} -> {results[f['isin']]}")
-        browser.close()
+        print(f"[robot] {f['isin']} -> {results[f['isin']]}")
     with open(OUT,"w",encoding="utf-8") as fh: json.dump(results,fh,ensure_ascii=False,indent=2)
     with open(HIST,"w",encoding="utf-8") as fh: json.dump(history,fh,ensure_ascii=False,indent=2)
     print(f"[robot] Ecrit {OUT} et {HIST}")
