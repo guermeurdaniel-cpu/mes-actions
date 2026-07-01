@@ -6,7 +6,7 @@
     "value": 38.96,
     "currency": "EUR",
     "date": "2026-06-26",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
@@ -15,7 +15,7 @@
     "value": 327.83,
     "currency": "EUR",
     "date": "2026-06-29",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
@@ -24,15 +24,15 @@
     "value": 1309.6463,
     "currency": "EUR",
     "date": "2026-06-30",
-    "status": "ok"
+    "status": "ancien"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity-Rated",
     "category": "AV",
-    "value": 10913.18,
+    "value": 10913.94,
     "currency": "EUR",
-    "date": "2026-06-29",
+    "date": "2026-06-30",
     "status": "ok"
   },
   "FR0010149120": {
