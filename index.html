@@ -145,7 +145,8 @@ const QUANTITES = {
   "CC4.PA": 14.3407,        // ETF Amundi Euro Corporate SRI (LU1681039647)
   // PEA
   "WPEA.PA": 5863,
-  "PAASI.PA": 248          // ETF Amundi PEA Asie Emergente (FR0013412012)
+  "PAASI.PA": 248,         // ETF Amundi PEA Asie Emergente (FR0013412012)
+  "ASML.AS": 1            // ASML Holding (NL0010273215) - Euronext Amsterdam
 };
 const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
 const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
@@ -157,6 +158,7 @@ const REF_DATE = "2026-06-16";
 const PRU = {
   "WPEA.PA":      6.78,
   "PAASI.PA":     40.54,
+  "ASML.AS":      1723.48,      // ASML Holding - PRU
   // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
   "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
   "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
@@ -168,7 +170,7 @@ const PRU = {
 // Enveloppes (sert au detail PMV et au cumul)
 const ENVELOPPES = [
   {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
-  {name:"PEA", keys:["WPEA.PA","PAASI.PA"]},
+  {name:"PEA", keys:["WPEA.PA","PAASI.PA","ASML.AS"]},
   {name:"AV",  keys:["FR0011408798","FR0010149120","CC4.PA"]}
 ];
 
@@ -184,7 +186,8 @@ const EQUITY_FRACTION = {
   "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
   "CC4.PA":       0.00,          // Amundi Euro Corporate SRI (oblig)
   "WPEA.PA":      1.00,          // ETF MSCI World
-  "PAASI.PA":     1.00           // ETF PEA Asie Emergente (actions)
+  "PAASI.PA":     1.00,          // ETF PEA Asie Emergente (actions)
+  "ASML.AS":      1.00           // ASML Holding (action)
 };
 
 // --- Repartition geographique des ACTIONS (par mandat d'indice) ---
@@ -193,7 +196,8 @@ const GEO_EQUITY = {
   "QS0009080175": { world:1.00, euro:0.00, em:0.00 }, // benchmark MSCI World
   "QS0009080746": { world:0.50, euro:0.50, em:0.00 }, // poche actions = 1/2 World + 1/2 zone euro
   "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }, // MSCI World
-  "PAASI.PA":     { world:0.00, euro:0.00, em:1.00 }  // MSCI Emerging Asia (emergents)
+  "PAASI.PA":     { world:0.00, euro:0.00, em:1.00 }, // MSCI Emerging Asia (emergents)
+  "ASML.AS":      { world:1.00, euro:0.00, em:0.00 }  // ASML - classee Monde developpe
 };
 // =======================================================
 
@@ -201,6 +205,7 @@ const GEO_EQUITY = {
 const MARKET = [
   { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
   { symbol:"PAASI.PA",label:"ETF PEA Asie Emergente", group:"pea" },
+  { symbol:"ASML.AS", label:"ASML Holding",           group:"pea" },
   { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" }
 ];
 
@@ -228,7 +233,7 @@ function buildTotalSeries(data, hist, yres, costBasis){
     if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return q*e.value;}) }); }
     else if(f.value!=null){ series.push({ dates:[todayStr()], vals:[q*f.value] }); }
   }
-  ["WPEA.PA","PAASI.PA","CC4.PA"].forEach(function(sym){
+  ["WPEA.PA","PAASI.PA","ASML.AS","CC4.PA"].forEach(function(sym){
     const y=yres[sym], q=qtyOf(sym);
     if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c){return q*c;}) }); }
   });
@@ -380,7 +385,7 @@ async function loadAll(){
 
   // --- PEA (ETF Monde) ---
   const refBox=document.getElementById("refs"); refBox.innerHTML="";
-  ["WPEA.PA","PAASI.PA"].forEach(function(sym){
+  ["WPEA.PA","PAASI.PA","ASML.AS"].forEach(function(sym){
     const it=yres[sym]; if(!it) return;
     const row=document.createElement("div"); row.className="row";
     if(it.q){ row.innerHTML=rowYahoo({symbol:sym,label:it.t.label,q:it.q},gmin,gmax); peaTotal += qtyOf(sym)*it.q.price; }
@@ -507,7 +512,7 @@ async function loadAll(){
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
     function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
-    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="CC4.PA")? valYahoo(k) : valFund(k); }
+    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="ASML.AS"||k==="CC4.PA")? valYahoo(k) : valFund(k); }
     var actions=0, defensif=0, total=0;
     for(var k in EQUITY_FRACTION){
       var v=holdingEur(k); if(!v) continue;
