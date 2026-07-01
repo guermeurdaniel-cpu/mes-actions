@@ -20,10 +20,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer Playwright + navigateur
-        run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
+      - name: Installer les dependances
+        run: pip install requests
 
       - name: Lancer le robot
         run: python scraper.py
@@ -36,7 +34,6 @@ jobs:
             git add nav.json history.json
             git commit -m "MAJ VL Amundi"
             git push
-
           else
             echo "Aucun changement de VL."
           fi
