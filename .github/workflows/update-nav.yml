@@ -21,7 +21,9 @@ jobs:
           python-version: "3.12"
 
       - name: Installer les dependances
-        run: pip install curl-cffi
+        run: |
+          pip install curl-cffi playwright
+          python -m playwright install --with-deps chromium
 
       - name: Lancer le robot
         run: python scraper.py
