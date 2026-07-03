@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# Recuperation des VL sans navigateur (plus de Playwright) :
+# Recuperation des VL sans navigateur (plus de Playwright), via curl_cffi (empreinte TLS Chrome) :
 #  - Fonds PEG (QS...) : API JSON interne Amundi EE  /product-services/fdr/share/v3/full/{ISIN}
 #                        -> champ lastNav.value (nombre) et lastNav.date (ISO AAAA-MM-JJ)
 #  - Fonds AV  (FR...) : page abcbourse.com, VL lue dans le HTML servi.
 # Run attendu : quelques secondes (aucun Chromium a installer, aucun rendu a attendre).
 import json, re, os, datetime, time
-import requests
+# curl_cffi remplace requests : meme API, mais reproduit l'empreinte TLS/JA3/HTTP2 de Chrome.
+# Necessaire car l'API Amundi filtre par empreinte TLS (405 avec requests, 200 en navigateur).
+from curl_cffi import requests
 
 FONDS = [
     { "isin":"QS0009080175", "label":"Amundi Actions Internationales ESR - F", "category":"PEG", "source":"amundi-api" },
@@ -32,7 +34,7 @@ def parse_num(s):
 def http_get(url, headers, tries=3, timeout=30):
     for t in range(1, tries+1):
         try:
-            r = requests.get(url, headers=headers, timeout=timeout)
+            r = requests.get(url, headers=headers, timeout=timeout, impersonate="chrome")
             if r.status_code == 200:
                 return r
             print(f"[http] {url} -> HTTP {r.status_code} (essai {t}/{tries})")
