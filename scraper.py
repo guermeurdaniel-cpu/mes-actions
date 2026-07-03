@@ -39,10 +39,14 @@ def parse_num(s):
         s = s.replace(',','.')
     return float(s)
 
-def http_get(url, headers, tries=3, timeout=30):
+def http_req(url, headers, tries=3, timeout=30, json_body=None):
+    # json_body != None -> POST (l'API Amundi n'accepte que POST : GET -> 405)
     for t in range(1, tries+1):
         try:
-            r = requests.get(url, headers=headers, timeout=timeout, impersonate="chrome")
+            if json_body is not None:
+                r = requests.post(url, headers=headers, json=json_body, timeout=timeout, impersonate="chrome")
+            else:
+                r = requests.get(url, headers=headers, timeout=timeout, impersonate="chrome")
             if r.status_code == 200:
                 return r
             print(f"[http] {url} -> HTTP {r.status_code} (essai {t}/{tries})")
@@ -50,6 +54,9 @@ def http_get(url, headers, tries=3, timeout=30):
             print(f"[http] {url} erreur: {e} (essai {t}/{tries})")
         time.sleep(4)
     return None
+
+def http_get(url, headers, tries=3, timeout=30):
+    return http_req(url, headers, tries=tries, timeout=timeout)
 
 # --- PEG : API JSON Amundi EE ------------------------------------------------
 def find_last_nav(obj):
@@ -71,12 +78,16 @@ def scrape_amundi_api(isin):
     url = f"https://www.amundi-ee.com/product-services/fdr/share/v3/full/{isin}"
     headers = {
         "User-Agent": UA,
-        "Accept": "application/json, text/plain, */*",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
         "Accept-Language": "fr-FR,fr;q=0.9",
+        "Origin": "https://www.amundi-ee.com",
         "Referer": f"https://www.amundi-ee.com/epargnant/product/view/{isin}",
     }
-    print(f"[amundi] {url}")
-    r = http_get(url, headers)
+    # L'API exige un POST dont le corps liste les champs voulus (GET -> 405).
+    body = {"fields": ["isin", "label", "lastNav.value", "lastNav.date", "currency.iso3Code"]}
+    print(f"[amundi] POST {url}")
+    r = http_req(url, headers, json_body=body)
     if not r:
         return None, None
     try:
