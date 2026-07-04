@@ -30,18 +30,27 @@
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity-Rated",
     "category": "AV",
-    "value": 10915.33,
+    "value": 10916.03,
     "currency": "EUR",
-    "date": "2026-07-02",
+    "date": "2026-07-03",
     "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite AW EUR",
     "category": "AV",
-    "value": 1935.57,
+    "value": 1935.96,
     "currency": "EUR",
-    "date": "2026-07-01",
+    "date": "2026-07-02",
     "status": "ok"
+  },
+  "FR001400HHQ5": {
+    "isin": "FR001400HHQ5",
+    "label": "ODDO BHF Global Target IG 2029",
+    "category": "AV",
+    "value": null,
+    "currency": "EUR",
+    "date": "2026-07-04",
+    "status": "not_found"
   }
 }
