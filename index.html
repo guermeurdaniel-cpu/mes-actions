@@ -143,6 +143,7 @@ const QUANTITES = {
   // Assurance vie - unites de compte
   "FR0011408798": 0.3054,
   "FR0010149120": 1.6917,
+  "FR001400HHQ5": 0.2720,   // ODDO BHF Global Target IG 2029 (fonds obligataire date)
   "CC4.PA": 14.3676,        // ETF Amundi Euro Corporate SRI (LU1681039647)
   // PEA
   "WPEA.PA": 5863,
@@ -164,7 +165,7 @@ const PRU = {
   "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
   "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
   "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
-  "FR0011408798": 10884.88,    // Amundi Euro Liquidity-Rated
+  "FR0011408798": 10885.40,    // Amundi Euro Liquidity-Rated (PRU post-arbitrage 07/2026)
   "FR0010149120": 1924.08,     // Carmignac Securite
   "CC4.PA":       226.55       // Amundi Euro Corporate SRI ETF
 };
@@ -172,7 +173,7 @@ const PRU = {
 const ENVELOPPES = [
   {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
   {name:"PEA", keys:["WPEA.PA","PAASI.PA","ASML.AS"]},
-  {name:"AV",  keys:["FR0011408798","FR0010149120","CC4.PA"]}
+  {name:"AV",  keys:["FR0011408798","FR0010149120","FR001400HHQ5","CC4.PA"]}
 ];
 
 // --- Synthese allocation actions / defensif : parametres ---
@@ -185,6 +186,7 @@ const EQUITY_FRACTION = {
   "QS0009080720": 0.00,          // Amundi Label Monetaire ESR
   "FR0011408798": 0.00,          // Amundi Euro Liquidity-Rated
   "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
+  "FR001400HHQ5": 0.00,          // ODDO BHF Global Target IG 2029 (oblig datees)
   "CC4.PA":       0.00,          // Amundi Euro Corporate SRI (oblig)
   "WPEA.PA":      1.00,          // ETF MSCI World
   "PAASI.PA":     1.00,          // ETF PEA Asie Emergente (actions)
