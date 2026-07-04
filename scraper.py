@@ -25,8 +25,8 @@ FONDS = [
       "url":"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_sFR0011408798" },
     { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV", "source":"abcbourse",
       "url":"https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120" },
-    { "isin":"FR001400HHQ5", "label":"ODDO BHF Global Target IG 2029", "category":"AV", "source":"abcbourse",
-      "url":"https://www.abcbourse.com/opcvm/oddo-bhf-global-target-ig-2029-cr-eur_sFR001400HHQ5" },
+    { "isin":"FR001400HHQ5", "label":"ODDO BHF Global Target IG 2029", "category":"AV", "source":"boursier",
+      "url":"https://www.boursier.com/opcvm/cours/oddo-bhf-global-target-ig-2029-cr-eur-FR001400HHQ5,FR.html" },
 ]
 OUT = "nav.json"; HIST = "history.json"
 
@@ -225,6 +225,40 @@ def scrape_abcbourse(url):
         print(f"[abcbourse]   value={value} date={nav_date}")
     return value, nav_date
 
+# --- AV : page HTML boursier.com ----------------------------------------------
+def scrape_boursier(url):
+    headers = {
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+    }
+    print(f"[boursier] {url}")
+    r = http_get(url, headers)
+    if not r:
+        return None, None
+    text = html_to_text(r.text)
+    value = None; nav_date = None
+    # 1) motif principal : "Valeur liquidative ... 111,05 (EUR|€)" avec date proche
+    m = re.search(r'[Vv]aleur\s+[Ll]iquidative\D{0,120}?([\d\u00a0 ]+,\d{2,4})\s*(?:€|EUR)', text)
+    if not m:
+        # 2) repli : "Cours ... 111,05 €" en tete de fiche
+        m = re.search(r'[Cc]ours\D{0,60}?([\d\u00a0 ]+,\d{2,4})\s*(?:€|EUR)', text)
+    if not m:
+        # 3) dernier repli : premier nombre suivi de € dans la page
+        m = re.search(r'([\d\u00a0 ]+,\d{2,4})\s*€', text)
+    if m:
+        value = parse_num(m.group(1))
+    d = re.search(r'(\d{2}/\d{2}/\d{4})', text)
+    if d:
+        jj, mm, aaaa = d.group(1).split("/"); nav_date = f"{aaaa}-{mm}-{jj}"
+    if value is None:
+        print("[boursier]   VL introuvable ; extrait autour de 'liquidat':")
+        i = text.lower().find("liquidat")
+        print(text[max(0,i-150):i+250] if i>=0 else text[:400])
+    else:
+        print(f"[boursier]   value={value} date={nav_date}")
+    return value, nav_date
+
 # --- IO ----------------------------------------------------------------------
 def load_json(path, default):
     if os.path.exists(path):
@@ -256,6 +290,8 @@ def main():
             if value is None:
                 print(f"[robot]   API KO -> repli Playwright pour {f['isin']}")
                 value,nav_date=scrape_amundi_playwright(f["isin"])
+        elif f["source"]=="boursier":
+            value,nav_date=scrape_boursier(f["url"])
         else:
             value,nav_date=scrape_abcbourse(f["url"])
 
