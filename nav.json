@@ -48,9 +48,9 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO BHF Global Target IG 2029",
     "category": "AV",
-    "value": null,
+    "value": 111.13,
     "currency": "EUR",
-    "date": "2026-07-04",
-    "status": "not_found"
+    "date": "2026-06-30",
+    "status": "ok"
   }
 }
