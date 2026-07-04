@@ -25,6 +25,8 @@ FONDS = [
       "url":"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_sFR0011408798" },
     { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV", "source":"abcbourse",
       "url":"https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120" },
+    { "isin":"FR001400HHQ5", "label":"ODDO BHF Global Target IG 2029", "category":"AV", "source":"abcbourse",
+      "url":"https://www.abcbourse.com/opcvm/oddo-bhf-global-target-ig-2029-cr-eur_sFR001400HHQ5" },
 ]
 OUT = "nav.json"; HIST = "history.json"
 
