@@ -21,9 +21,10 @@ FONDS = [
     { "isin":"QS0009080175", "label":"Amundi Actions Internationales ESR - F", "category":"PEG", "source":"amundi-api" },
     { "isin":"QS0009080746", "label":"Amundi Label Equilibre ESR - F",         "category":"PEG", "source":"amundi-api" },
     { "isin":"QS0009080720", "label":"Amundi Label Monetaire ESR - F",         "category":"PEG", "source":"amundi-api" },
-    { "isin":"FR0011408798", "label":"Amundi Euro Liquidity-Rated", "category":"AV", "source":"abcbourse",
-      "url":"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_sFR0011408798" },
-    { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV", "source":"abcbourse",
+    { "isin":"FR0011408798", "label":"Amundi Euro Liquidity-Rated", "category":"AV",
+      "source":"amundi-api", "endpoint":"amundi-fr" },
+    { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV",
+      "source":"abcbourse",
       "url":"https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120" },
     { "isin":"FR001400HHQ5", "label":"ODDO BHF Global Target IG 2029", "category":"AV", "source":"boursier",
       "url":"https://www.boursier.com/opcvm/cours/oddo-bhf-global-target-ig-2029-cr-eur-FR001400HHQ5,FR.html" },
@@ -76,39 +77,57 @@ def find_last_nav(obj):
             if r: return r
     return None
 
-def scrape_amundi_api(isin):
-    url = f"https://www.amundi-ee.com/product-services/fdr/share/v3/full/{isin}"
+# Endpoints Amundi API (meme structure POST + corps {"fields":[...]}, domaines differents)
+AMUNDI_ENDPOINTS = {
+    # Fonds epargne salariale (ISIN QS...) -> amundi-ee.com
+    "amundi-ee": {
+        "host": "https://www.amundi-ee.com",
+        "ref":  "https://www.amundi-ee.com/epargnant/product/view/{isin}",
+    },
+    # Fonds grand public Amundi (ISIN FR...) -> amundi.fr
+    "amundi-fr": {
+        "host": "https://www.amundi.fr",
+        "ref":  "https://www.amundi.fr/fr_instit/product/view/{isin}",
+    },
+}
+
+def _call_amundi_endpoint(isin, endpoint_key):
+    ep = AMUNDI_ENDPOINTS[endpoint_key]
+    url = f"{ep['host']}/product-services/fdr/share/v3/full/{isin}"
+    ref = ep["ref"].format(isin=isin)
     headers = {
         "User-Agent": UA,
         "Accept": "application/json",
         "Content-Type": "application/json",
         "Accept-Language": "fr-FR,fr;q=0.9",
-        "Origin": "https://www.amundi-ee.com",
-        "Referer": f"https://www.amundi-ee.com/epargnant/product/view/{isin}",
+        "Origin": ep["host"],
+        "Referer": ref,
     }
-    # L'API exige un POST dont le corps liste les champs voulus (GET -> 405).
     body = {"fields": ["isin", "label", "lastNav.value", "lastNav.date", "currency.iso3Code"]}
-    print(f"[amundi] POST {url}")
+    print(f"[amundi:{endpoint_key}] POST {url}")
     r = http_req(url, headers, json_body=body)
     if not r:
         return None, None
     try:
         data = r.json()
     except Exception as e:
-        print(f"[amundi]   JSON invalide: {e}")
+        print(f"[amundi:{endpoint_key}]   JSON invalide: {e}")
         return None, None
     nav = find_last_nav(data)
     if nav and nav.get("value") is not None:
         try:
             value = float(nav["value"])
         except Exception:
-            print(f"[amundi]   value non numerique: {nav.get('value')}")
+            print(f"[amundi:{endpoint_key}]   value non numerique: {nav.get('value')}")
             return None, None
-        nav_date = nav.get("date")  # deja au format ISO AAAA-MM-JJ
-        print(f"[amundi]   value={value} date={nav_date}")
+        nav_date = nav.get("date")
+        print(f"[amundi:{endpoint_key}]   value={value} date={nav_date}")
         return value, nav_date
-    print(f"[amundi]   lastNav/value introuvable dans le JSON")
+    print(f"[amundi:{endpoint_key}]   lastNav/value introuvable dans le JSON")
     return None, None
+
+def scrape_amundi_api(isin, endpoint_key="amundi-ee"):
+    return _call_amundi_endpoint(isin, endpoint_key)
 
 # --- PEG repli : page produit via Playwright (regex multi-lignes validee) -----
 _PW = {"browser": None, "page": None, "ctx": None, "pw": None, "failed": False}
@@ -286,10 +305,17 @@ def main():
     results={}; history=load_json(HIST,{})
     for f in FONDS:
         if f["source"]=="amundi-api":
-            value,nav_date=scrape_amundi_api(f["isin"])
-            if value is None:
+            ep = f.get("endpoint","amundi-ee")
+            value,nav_date=scrape_amundi_api(f["isin"], ep)
+            if value is None and ep=="amundi-ee":
+                # repli Playwright uniquement pour les fonds epargne salariale
                 print(f"[robot]   API KO -> repli Playwright pour {f['isin']}")
                 value,nav_date=scrape_amundi_playwright(f["isin"])
+            elif value is None and ep=="amundi-fr":
+                # repli abcbourse pour les fonds AV Amundi
+                print(f"[robot]   amundi.fr KO -> repli abcbourse pour {f['isin']}")
+                value,nav_date=scrape_abcbourse(
+                    f"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_s{f['isin']}")
         elif f["source"]=="boursier":
             value,nav_date=scrape_boursier(f["url"])
         else:
