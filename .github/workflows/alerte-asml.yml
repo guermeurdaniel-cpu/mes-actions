@@ -2,36 +2,63 @@ name: Alerte ASML
 
 on:
   schedule:
-    # Toutes les 15 minutes, de 8h a 18h UTC (= 9h-19h Paris hiver, 10h-20h ete)
-    # Les marches Amsterdam ouvrent a 9h et ferment a 17h30 heure locale.
-    - cron: "*/15 8-18 * * 1-5"
-  workflow_dispatch:   # permet de lancer manuellement pour tester
+    # Toutes les 5 minutes, de 8h a 18h UTC (= 9h-19h Paris hiver, 10h-20h ete)
+    - cron: "*/5 8-18 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   check-asml:
     runs-on: ubuntu-latest
     steps:
-      - name: Verifier le cours ASML
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      - name: Verifier le franchissement de bande ASML
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python3 - << 'PYEOF'
-          import urllib.request, json, sys, datetime
+          import urllib.request, urllib.parse, json, sys, datetime, os
 
-          SYMBOL   = "ASML.AS"
-          SEUIL    = 4          # % de baisse declenchant l'alerte
-          UA       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          SYMBOL     = "ASML.AS"
+          BORNE_BAS  = 4  # % sous la cloture de la veille
+          BORNE_HAUT =  3.0   # % au-dessus de la cloture de la veille
+          STATE_FILE = "alerte_asml_state.json"
+          UA         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
-          url = (
-              "https://query1.finance.yahoo.com/v8/finance/chart/"
-              + SYMBOL
-              + "?range=2d&interval=1d"
-          )
+          TOKEN   = os.environ.get("TELEGRAM_TOKEN","")
+          CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID","")
+
+          today = datetime.date.today().isoformat()
+
+          # --- Lire l'etat precedent ---
+          state = {"date": None, "in_band": True}
+          if os.path.exists(STATE_FILE):
+              try:
+                  with open(STATE_FILE) as f:
+                      state = json.load(f)
+              except Exception:
+                  pass
+
+          # Nouveau jour : on repart de "dans la bande"
+          if state.get("date") != today:
+              state["in_band"] = True
+              state["date"]    = today
+
+          # --- Recuperer le cours Yahoo ---
+          url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+                 + SYMBOL + "?range=2d&interval=1d")
           req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
           try:
               with urllib.request.urlopen(req, timeout=20) as r:
                   data = json.load(r)
           except Exception as e:
               print(f"[alerte] Impossible de joindre Yahoo : {e}")
-              sys.exit(0)   # pas d'alerte si Yahoo est injoignable
+              sys.exit(0)
 
           try:
               meta   = data["chart"]["result"][0]["meta"]
@@ -42,13 +69,65 @@ jobs:
               print(f"[alerte] Format Yahoo inattendu : {e}")
               sys.exit(0)
 
-          now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-          print(f"[alerte] {SYMBOL}  cours={price:.2f} EUR  veille={prev:.2f} EUR  variation={change:+.2f}%  [{now}]")
+          now = datetime.datetime.utcnow().strftime("%H:%M UTC")
+          print(f"[alerte] {SYMBOL}  cours={price:.2f} EUR  veille={prev:.2f} EUR  "
+                f"variation={change:+.2f}%  bande=[{BORNE_BAS:+.0f}%,{BORNE_HAUT:+.0f}%]  [{now}]")
 
-          if change <= SEUIL:
-              print(f"[ALERTE] Seuil franchi : {change:.2f}% <= {SEUIL}%  -> echec volontaire pour notification GitHub")
-              sys.exit(1)   # GitHub envoie un email de notification d'echec
+          current_in_band = (BORNE_BAS <= change <= BORNE_HAUT)
+          was_in_band     = state["in_band"]
+          franchissement  = was_in_band and not current_in_band
+
+          direction = ("BASSE ⬇️" if change < BORNE_BAS else "HAUTE ⬆️") if not current_in_band else ""
+
+          print(f"[alerte] Precedemment dans la bande : {was_in_band}  |  Actuellement : {current_in_band}")
+
+          # Mettre a jour l'etat
+          state["in_band"] = current_in_band
+          state["date"]    = today
+          with open(STATE_FILE, "w") as f:
+              json.dump(state, f, indent=2)
+
+          if franchissement:
+              emoji = "🔴" if change < 0 else "🟢"
+              msg = (
+                  f"{emoji} ALERTE ASML — Franchissement borne {direction}\n"
+                  f"Cours : {price:.2f} EUR\n"
+                  f"Variation : {change:+.2f}% (veille : {prev:.2f} EUR)\n"
+                  f"Bande : [{BORNE_BAS:+.0f}%, {BORNE_HAUT:+.0f}%]\n"
+                  f"Heure : {now}"
+              )
+              print(f"[ALERTE] {msg}")
+              # Envoi Telegram
+              if TOKEN and CHAT_ID:
+                  tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+                  payload = json.dumps({"chat_id": CHAT_ID, "text": msg}).encode()
+                  tg_req  = urllib.request.Request(tg_url, data=payload,
+                              headers={"Content-Type": "application/json"})
+                  try:
+                      with urllib.request.urlopen(tg_req, timeout=10) as r:
+                          resp = json.load(r)
+                      if resp.get("ok"):
+                          print("[alerte] Message Telegram envoye.")
+                      else:
+                          print(f"[alerte] Telegram erreur : {resp}")
+                  except Exception as e:
+                      print(f"[alerte] Telegram indisponible : {e}")
+              else:
+                  print("[alerte] Secrets Telegram absents — message non envoye.")
           else:
-              print(f"[OK] Pas d'alerte. Variation dans la norme.")
-              sys.exit(0)
+              if current_in_band:
+                  print(f"[OK] Dans la bande ({change:+.2f}%).")
+              else:
+                  print(f"[OK] Hors bande ({change:+.2f}%) mais deja sorti precedemment.")
+
+          sys.exit(0)   # toujours succes : la notification passe par Telegram
           PYEOF
+
+      - name: Commiter l'etat mis a jour
+        if: always()
+        run: |
+          git config user.name "alerte-bot"
+          git config user.email "alerte-bot@users.noreply.github.com"
+          git add alerte_asml_state.json
+          git diff --staged --quiet || git commit -m "Etat alerte ASML $(date +%Y-%m-%d\ %H:%M)"
+          git push || echo "Rien a pousser"
