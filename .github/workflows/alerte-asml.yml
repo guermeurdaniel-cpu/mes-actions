@@ -25,7 +25,7 @@ jobs:
           import urllib.request, urllib.parse, json, sys, datetime, os
 
           SYMBOL     = "ASML.AS"
-          BORNE_BAS  = 4  # % sous la cloture de la veille
+          BORNE_BAS  = -3.0  # % sous la cloture de la veille
           BORNE_HAUT =  3.0   # % au-dessus de la cloture de la veille
           STATE_FILE = "alerte_asml_state.json"
           UA         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
