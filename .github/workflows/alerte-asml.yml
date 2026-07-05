@@ -17,7 +17,7 @@ jobs:
           import urllib.request, json, sys, datetime
 
           SYMBOL   = "ASML.AS"
-          SEUIL    = 0          # % de baisse declenchant l'alerte
+          SEUIL    = 4          # % de baisse declenchant l'alerte
           UA       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
           url = (
