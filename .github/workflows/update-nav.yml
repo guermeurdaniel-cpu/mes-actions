@@ -2,7 +2,7 @@ name: Mise a jour VL Amundi
 
 on:
   schedule:
-    - cron: "*/15 8-18 * * 1-5"
+    - cron: "*/60 8-18 * * 1-5"
   workflow_dispatch:
 
 permissions:
