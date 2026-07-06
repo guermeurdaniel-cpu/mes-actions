@@ -299,23 +299,57 @@ function variation(values){ if(!values||values.length<2)return null; return (val
 function lastChange(values){ if(!values||values.length<2)return null; const a=values[values.length-2],b=values[values.length-1]; return {diff:b-a,pct:(b-a)/a*100}; }
 function pctSpan(p,l){ if(p==null||!isFinite(p))return ""; return '<span class="'+(p>=0?'up':'down')+'">'+l+(p>=0?'+':'')+p.toFixed(2)+'%</span>'; }
 
+// --- Cours live Yahoo via proxies CORS en cascade ---
+// Durable : quand le Worker Cloudflare sera deploye, mets son URL ici (sinon laisse "").
+const MON_PROXY = "";  // ex: "https://ton-worker.workers.dev/?url="
+
+const YH_PROXIES = [
+  {u:"https://corsproxy.io/?url=",               enc:true},
+  {u:"https://api.allorigins.win/raw?url=",      enc:true},
+  {u:"https://thingproxy.freeboard.io/fetch/",   enc:false},
+  {u:"https://api.codetabs.com/v1/proxy/?quest=",enc:true}
+];
+
 async function fetchYahoo(symbol){
-  const y="https://query1.finance.yahoo.com/v8/finance/chart/"+symbol+"?range=1mo&interval=1d";
-  const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(y));
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  const d=await r.json(); const res=d.chart.result[0]; const m=res.meta;
-  const ts=res.timestamp||[];
-  const rawCloses=res.indicators.quote[0].close||[];
-  const closes=[], dates=[];
-  for(let i=0;i<rawCloses.length;i++){
-    if(rawCloses[i]!=null){
-      closes.push(rawCloses[i]);
-      dates.push(new Date(ts[i]*1000).toISOString().slice(0,10));
+  const bases = [
+    "https://query1.finance.yahoo.com/v8/finance/chart/",
+    "https://query2.finance.yahoo.com/v8/finance/chart/"
+  ];
+  const proxies = MON_PROXY ? [{u:MON_PROXY,enc:true}, ...YH_PROXIES] : YH_PROXIES.slice();
+  let lastErr = null;
+  for(const base of bases){
+    const yurl = base + symbol + "?range=1mo&interval=1d";
+    for(const p of proxies){
+      const target = p.u + (p.enc ? encodeURIComponent(yurl) : yurl);
+      const ctl = new AbortController();
+      const timer = setTimeout(()=>ctl.abort(), 6000);
+      try{
+        const r = await fetch(target, {signal:ctl.signal});
+        clearTimeout(timer);
+        if(!r.ok){ lastErr = new Error("HTTP "+r.status+" ("+p.u+")"); continue; }
+        const d = await r.json();
+        const res = d && d.chart && d.chart.result && d.chart.result[0];
+        if(!res){ lastErr = new Error("payload vide ("+p.u+")"); continue; }
+        const m = res.meta, ts = res.timestamp||[];
+        const rawCloses = (res.indicators && res.indicators.quote && res.indicators.quote[0].close) || [];
+        const closes=[], dates=[];
+        for(let i=0;i<rawCloses.length;i++){
+          if(rawCloses[i]!=null){
+            closes.push(rawCloses[i]);
+            dates.push(new Date(ts[i]*1000).toISOString().slice(0,10));
+          }
+        }
+        if(!closes.length){ lastErr = new Error("0 cloture ("+p.u+")"); continue; }
+        const price = (m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
+        const prev  = (m.previousClose!=null)?m.previousClose:closes[closes.length-2];
+        return {price:price, prev:prev, cur:m.currency, closes:closes, dates:dates};
+      }catch(e){
+        clearTimeout(timer);
+        lastErr = e;   // proxy mort / timeout / CORS -> proxy suivant
+      }
     }
   }
-  const price=(m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
-  const prev=(m.previousClose!=null)?m.previousClose:closes[closes.length-2];
-  return {price:price,prev:prev,cur:m.currency,closes:closes,dates:dates};
+  throw lastErr || new Error("tous les proxies KO pour "+symbol);
 }
 
 function rowYahoo(it, gmin, gmax){
