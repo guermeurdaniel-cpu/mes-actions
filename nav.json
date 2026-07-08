@@ -3,9 +3,9 @@
     "isin": "QS0009080175",
     "label": "Amundi Actions Internationales ESR - F",
     "category": "PEG",
-    "value": 39.84,
+    "value": 39.56,
     "currency": "EUR",
-    "date": "2026-07-06",
+    "date": "2026-07-07",
     "status": "ok"
   },
   "QS0009080746": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO BHF Global Target IG 2029",
     "category": "AV",
-    "value": 111.08,
+    "value": 110.99,
     "currency": "EUR",
     "date": "2026-07-07",
     "status": "ok"
