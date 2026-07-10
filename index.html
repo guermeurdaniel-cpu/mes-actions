@@ -137,7 +137,7 @@
 // =======================================================
 const QUANTITES = {
   // PEG (fonds Amundi ESR)
-  "QS0009080175": 1156.7167 + 941.2472,  // tranche PEG + tranche PER
+  "QS0009080175": 1156.7167 + 941.2472 + 88.2604,  // tranche PEG + tranche PER
   "QS0009080746": 75.4236,
   "QS0009080720": 9.4187,
   // Assurance vie - unites de compte
@@ -162,7 +162,7 @@ const PRU = {
   "PAASI.PA":     40.54,
   "ASML.AS":      1621.67,      // ASML Holding - PRU
   // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
-  "QS0009080175": (941.2472*38.68 + 1156.7167*39.07)/(941.2472+1156.7167),
+  "QS0009080175": (941.2472*38.68 + 1156.7167*39.07 + 88.2604*39.56)/(941.2472+1156.7167+88.2604),
   "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
   "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
   "FR0011408798": 10885.40,    // Amundi Euro Liquidity-Rated (PRU post-arbitrage 07/2026)
