@@ -12,9 +12,9 @@
     "isin": "QS0009080746",
     "label": "Amundi Label Equilibre ESR - F",
     "category": "PEG",
-    "value": 326.45,
+    "value": 326.21,
     "currency": "EUR",
-    "date": "2026-07-13",
+    "date": "2026-07-15",
     "status": "ok"
   },
   "QS0009080720": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO BHF Global Target IG 2029",
     "category": "AV",
-    "value": 110.71,
+    "value": 110.68,
     "currency": "EUR",
     "date": "2026-07-07",
     "status": "ok"
