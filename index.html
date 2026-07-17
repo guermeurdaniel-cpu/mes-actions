@@ -536,7 +536,8 @@ async function loadAll(){
     const td=totalSeries.dates;
     const pct=totalSeries.values.map(function(v){ return (v/pmv.totCost-1)*100; });
     totalChartIdx=allCharts.length;
-    allCharts.push({label:"Patrimoine total (PMV en %)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true});
+    // compareValues : serie EUR conservee pour le comparateur base 100 (une serie en % ne peut pas etre re-basee a 100)
+    allCharts.push({label:"Patrimoine total (PMV en %)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
   }
   // Patrimoine reel : valeur absolue quotidienne (bourse + apports), historisee par patrimoine.py
   if(patHist.length>=2){
@@ -662,7 +663,8 @@ function openMultiChart(){
   const dates=Object.keys(dset).sort();
   // chaque serie : remplissage avant/arriere sur l'axe commun, puis base 100
   const series100=items.map(function(c){
-    const m={}; for(let i=0;i<c.dates.length;i++) m[c.dates[i]]=c.values[i];
+    const vals=c.compareValues||c.values; // serie re-basable (EUR) si la courbe affichee est en %
+    const m={}; for(let i=0;i<c.dates.length;i++) m[c.dates[i]]=vals[i];
     let firstKnown=null;
     for(let i=0;i<dates.length;i++){ if(m[dates[i]]!=null){ firstKnown=m[dates[i]]; break; } }
     const aligned=[]; let last=null;
