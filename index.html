@@ -397,6 +397,12 @@ async function loadAll(){
     data=await navR.json();
     try{ const hR=await fetch("history.json?t="+Date.now()); if(hR.ok) hist=await hR.json(); }catch(e){}
   }catch(e){}
+  // patrimoine.json : historique quotidien du patrimoine reel (ecrit par patrimoine.py)
+  let patHist=[];
+  try{
+    const pR=await fetch("patrimoine.json?t="+Date.now());
+    if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
+  }catch(e){}
 
   // Echelle base 100 commune a toutes les courbes
   let gmin=Infinity, gmax=-Infinity;
@@ -523,13 +529,20 @@ async function loadAll(){
       +'<div class="cb-foot">Gain / perte par ligne depuis le PRU, % rapporte au total du jour ; somme = PMV totale.</div></div>';
   }
 
-  // --- Patrimoine consolide : courbe ancree au 16/06 (cout de revient) + cumul rouge = PMV ---
-  let totalChartIdx=-1, progHtml="";
+  // --- Patrimoine consolide : courbe en % de PMV (ancree 16/06) + courbe patrimoine reel (EUR) ---
+  let totalChartIdx=-1, realChartIdx=-1, progHtml="";
   const totalSeries=buildTotalSeries(data,hist,yres,pmv.totCost);
-  if(totalSeries && totalSeries.values.length>=2){
-    const tv=totalSeries.values, td=totalSeries.dates, n=tv.length;
+  if(totalSeries && totalSeries.values.length>=2 && pmv.totCost>0){
+    const td=totalSeries.dates;
+    const pct=totalSeries.values.map(function(v){ return (v/pmv.totCost-1)*100; });
     totalChartIdx=allCharts.length;
-    allCharts.push({label:"Patrimoine total", dates:td, values:tv, up:(tv[n-1]>=tv[0]), unit:"EUR", isTotal:true});
+    allCharts.push({label:"Patrimoine total (PMV en %)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true});
+  }
+  // Patrimoine reel : valeur absolue quotidienne (bourse + apports), historisee par patrimoine.py
+  if(patHist.length>=2){
+    const rv=patHist.map(function(e){return e.valeur;});
+    realChartIdx=allCharts.length;
+    allCharts.push({label:"Patrimoine reel (EUR)", dates:patHist.map(function(e){return e.date;}), values:rv, up:(rv[rv.length-1]>=rv[0]), unit:"EUR"});
   }
   // Le cumul affiche en haut = la PMV (calcul PRU), pas la variation brute de la courbe.
   if(pmv.totDay>0){
@@ -542,7 +555,8 @@ async function loadAll(){
       +'<span class="pct '+cl+'">'+sg+totPct.toFixed(2)+'%</span>'
       +'<span class="eurd '+cl+'">'+sg+eur(pmv.totGain)+'</span>'
       +'<span class="since">PMV depuis le 16/06</span>'
-      +(totalChartIdx>=0?'<span class="tap">&#9654; voir la courbe</span>':'')+'</div>';
+      +(totalChartIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')
+      +(realChartIdx>=0?'<span class="tap" onclick="event.stopPropagation();openFullChart('+realChartIdx+')">&#9654; patrimoine EUR</span>':'')+'</div>';
   }
 
   // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
@@ -754,10 +768,11 @@ function drawFullChart(d){
   const cont=document.getElementById("chartContainer");
   cont.innerHTML="";
   const values=d.values, dates=d.dates, n=values.length;
-  const moPct=variation(values);
+  // Pour une serie en %, la "variation" pertinente = ecart en points (dernier - premier)
+  const moPct=(d.unit==="%") ? (values[n-1]-values[0]) : variation(values);
   document.getElementById("chartMeta").textContent=
     n+" points - du "+fmtDate(dates[0])+" au "+fmtDate(dates[n-1])
-    +(moPct!=null?"  -  variation periode : "+(moPct>=0?"+":"")+moPct.toFixed(2)+"%":"");
+    +(moPct!=null?"  -  variation periode : "+(moPct>=0?"+":"")+moPct.toFixed(2)+(d.unit==="%"?" pts":"%"):"");
 
   const W=cont.clientWidth||window.innerWidth, H=cont.clientHeight||300;
   const padL=44, padR=10, padT=14, padB=26;
@@ -813,7 +828,7 @@ function drawFullChart(d){
     document.getElementById("chLine").setAttribute("x1",cx); document.getElementById("chLine").setAttribute("x2",cx);
     document.getElementById("chDot").setAttribute("cx",cx); document.getElementById("chDot").setAttribute("cy",cy);
     const v=values[i];
-    const valTxt=(d.unit==="EUR"||d.unit==="")? v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4}) : v.toFixed(4);
+    const valTxt=(d.unit==="%")? v.toFixed(2) : (d.unit==="EUR"||d.unit==="")? v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4}) : v.toFixed(4);
     document.getElementById("chartReadout").innerHTML=
       '<div class="v">'+valTxt+(d.unit?" "+d.unit:"")+'</div><div class="d">'+dates[i]+'</div>';
   }
