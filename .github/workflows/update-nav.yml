@@ -28,14 +28,17 @@ jobs:
       - name: Lancer le robot
         run: python scraper.py
 
-      - name: Commiter nav.json si modifie
+      - name: Enregistrer le patrimoine du jour
+        run: python patrimoine.py
+
+      - name: Commiter si modifie
         run: |
           git config user.name "nav-bot"
           git config user.email "nav-bot@users.noreply.github.com"
-          if [ -n "$(git status --porcelain nav.json history.json)" ]; then
-            git add nav.json history.json
-            git commit -m "MAJ VL Amundi"
+          if [ -n "$(git status --porcelain nav.json history.json patrimoine.json)" ]; then
+            git add nav.json history.json patrimoine.json
+            git commit -m "MAJ VL + patrimoine"
             git push
           else
-            echo "Aucun changement de VL."
+            echo "Aucun changement."
           fi
