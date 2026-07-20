@@ -3,27 +3,27 @@
     "isin": "QS0009080175",
     "label": "Amundi Actions Internationales ESR - F",
     "category": "PEG",
-    "value": 39.58,
+    "value": 39.17,
     "currency": "EUR",
-    "date": "2026-07-16",
+    "date": "2026-07-17",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Amundi Label Equilibre ESR - F",
     "category": "PEG",
-    "value": 325.78,
+    "value": 324.27,
     "currency": "EUR",
-    "date": "2026-07-16",
+    "date": "2026-07-17",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Amundi Label Monetaire ESR - F",
     "category": "PEG",
-    "value": 1311.0211,
+    "value": 1311.237,
     "currency": "EUR",
-    "date": "2026-07-17",
+    "date": "2026-07-20",
     "status": "ok"
   },
   "FR0011408798": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO BHF Global Target IG 2029",
     "category": "AV",
-    "value": 110.64,
+    "value": 110.6,
     "currency": "EUR",
     "date": "2026-07-07",
     "status": "ok"
