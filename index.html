@@ -300,14 +300,13 @@ function lastChange(values){ if(!values||values.length<2)return null; const a=va
 function pctSpan(p,l){ if(p==null||!isFinite(p))return ""; return '<span class="'+(p>=0?'up':'down')+'">'+l+(p>=0?'+':'')+p.toFixed(2)+'%</span>'; }
 
 // --- Cours live Yahoo via proxies CORS en cascade ---
-// Durable : quand le Worker Cloudflare sera deploye, mets son URL ici (sinon laisse "").
-const MON_PROXY = "";  // ex: "https://ton-worker.workers.dev/?url="
+// Relais perso Cloudflare Worker, deploye le 22/07/2026. Place en tete de cascade
+// plus bas (MON_PROXY ? [...] : ...). Le suffixe /?url= fait partie de la valeur.
+const MON_PROXY = "https://flat-bread-4d06.guermeur-daniel.workers.dev/?url=";
 
 const YH_PROXIES = [
-  {u:"https://corsproxy.io/?url=",               enc:true},
-  {u:"https://api.allorigins.win/raw?url=",      enc:true},
-  {u:"https://thingproxy.freeboard.io/fetch/",   enc:false},
-  {u:"https://api.codetabs.com/v1/proxy/?quest=",enc:true}
+  {u:"https://api.codetabs.com/v1/proxy/?quest=",enc:true},
+  {u:"https://api.allorigins.win/raw?url=",      enc:true}
 ];
 
 async function fetchYahoo(symbol){
@@ -322,7 +321,7 @@ async function fetchYahoo(symbol){
     for(const p of proxies){
       const target = p.u + (p.enc ? encodeURIComponent(yurl) : yurl);
       const ctl = new AbortController();
-      const timer = setTimeout(()=>ctl.abort(), 6000);
+      const timer = setTimeout(()=>ctl.abort(), 3000);
       try{
         const r = await fetch(target, {signal:ctl.signal});
         clearTimeout(timer);
