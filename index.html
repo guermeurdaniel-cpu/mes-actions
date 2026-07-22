@@ -323,7 +323,7 @@ async function fetchYahoo(symbol){
       const ctl = new AbortController();
       const timer = setTimeout(()=>ctl.abort(), 3000);
       try{
-        const r = await fetch(target, {signal:ctl.signal});
+        const r = await fetch(target, {signal:ctl.signal, cache:"no-store"});
         clearTimeout(timer);
         if(!r.ok){ lastErr = new Error("HTTP "+r.status+" ("+p.u+")"); continue; }
         const d = await r.json();
