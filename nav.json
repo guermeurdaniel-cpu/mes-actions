@@ -3,27 +3,27 @@
     "isin": "QS0009080175",
     "label": "Amundi Actions Internationales ESR - F",
     "category": "PEG",
-    "value": 39.55,
+    "value": 39.22,
     "currency": "EUR",
-    "date": "2026-07-22",
+    "date": "2026-07-23",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Amundi Label Equilibre ESR - F",
     "category": "PEG",
-    "value": 326.02,
+    "value": 323.83,
     "currency": "EUR",
-    "date": "2026-07-22",
+    "date": "2026-07-23",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Amundi Label Monetaire ESR - F",
     "category": "PEG",
-    "value": 1311.4741,
+    "value": 1311.5504,
     "currency": "EUR",
-    "date": "2026-07-23",
+    "date": "2026-07-24",
     "status": "ok"
   },
   "FR0011408798": {
