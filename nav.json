@@ -30,18 +30,18 @@
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity-Rated",
     "category": "AV",
-    "value": 10933.2969,
+    "value": 10933.9863,
     "currency": "EUR",
-    "date": "2026-07-28",
+    "date": "2026-07-29",
     "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite AW EUR",
     "category": "AV",
-    "value": 1927.99,
+    "value": 1928.89,
     "currency": "EUR",
-    "date": "2026-07-24",
+    "date": "2026-07-27",
     "status": "ok"
   },
   "FR001400HHQ5": {
