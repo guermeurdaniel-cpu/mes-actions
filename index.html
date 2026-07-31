@@ -331,16 +331,35 @@ async function fetchYahoo(symbol){
         if(!res){ lastErr = new Error("payload vide ("+p.u+")"); continue; }
         const m = res.meta, ts = res.timestamp||[];
         const rawCloses = (res.indicators && res.indicators.quote && res.indicators.quote[0].close) || [];
+        // Decalage horaire de la place de cotation : les horodatages Yahoo sont en UTC,
+        // on les ramene a la date locale de la bourse pour dater correctement les seances.
+        const off = (m.gmtoffset||0)*1000;
+        const dayOf = function(sec){ return new Date(sec*1000+off).toISOString().slice(0,10); };
         const closes=[], dates=[];
         for(let i=0;i<rawCloses.length;i++){
           if(rawCloses[i]!=null){
             closes.push(rawCloses[i]);
-            dates.push(new Date(ts[i]*1000).toISOString().slice(0,10));
+            dates.push(dayOf(ts[i]));
           }
         }
         if(!closes.length){ lastErr = new Error("0 cloture ("+p.u+")"); continue; }
         const price = (m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
-        const prev  = (m.previousClose!=null)?m.previousClose:closes[closes.length-2];
+
+        // Cloture de la veille deduite des bougies, pas de meta.previousClose :
+        // sur interval=1d ce champ ne designe pas toujours la seance precedente.
+        // Date de la derniere cotation connue (jour de bourse en cours, ou derniere seance
+        // si le marche est ferme), puis comparaison avec la date de la derniere bougie.
+        const refDay = dayOf(m.regularMarketTime!=null ? m.regularMarketTime : Math.floor(Date.now()/1000));
+        let prev = null;
+        if(dates[dates.length-1] === refDay){
+          // La derniere bougie est celle de la seance en cours -> la veille est juste avant.
+          prev = (closes.length>=2) ? closes[closes.length-2] : null;
+        }else{
+          // Pas encore de bougie pour la seance en cours -> la veille est la derniere bougie.
+          prev = closes[closes.length-1];
+        }
+        if(prev==null && m.chartPreviousClose!=null) prev = m.chartPreviousClose;
+
         return {price:price, prev:prev, cur:m.currency, closes:closes, dates:dates};
       }catch(e){
         clearTimeout(timer);
