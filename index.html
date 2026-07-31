@@ -31,6 +31,9 @@
   .spark { width:88px; height:40px; display:block; }
   .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
   .refresh { display:block; margin:16px auto 0; background:#2c2c2e; color:#0a84ff; border:none; border-radius:10px; padding:8px 16px; font-size:14px; font-weight:600; }
+  .maj { text-align:center; font-size:11px; color:#8e8e93; margin:8px 4px 0; }
+  .maj.warn { color:#ff9f0a; }
+  .maj.ko { color:#ff453a; }
   .synth { background:linear-gradient(135deg,#0e3a2f,#0a2a45); border-radius:16px; padding:14px 16px; margin-top:10px; }
   .synth .lbl { font-size:13px; color:#bfe9d6; }
   .synth .big { font-size:26px; font-weight:800; margin-top:2px; }
@@ -114,6 +117,7 @@
   <div id="scaleNote"></div>
   <button class="compare" onclick="openMultiChart()">Comparer les courbes (base 100)</button>
   <button class="refresh" onclick="loadAll()">Actualiser</button>
+  <div id="maj" class="maj">Cotations : chargement...</div>
 
   <!-- Modal plein ecran pour un graphique detaille -->
   <div id="chartModal" class="chart-modal">
@@ -299,6 +303,38 @@ function variation(values){ if(!values||values.length<2)return null; return (val
 function lastChange(values){ if(!values||values.length<2)return null; const a=values[values.length-2],b=values[values.length-1]; return {diff:b-a,pct:(b-a)/a*100}; }
 function pctSpan(p,l){ if(p==null||!isFinite(p))return ""; return '<span class="'+(p>=0?'up':'down')+'">'+l+(p>=0?'+':'')+p.toFixed(2)+'%</span>'; }
 
+// --- Horodatage de la derniere mise a jour reussie des cotations ---
+// lastOkTime n'est avance que si TOUS les symboles de MARKET sont revenus.
+// Un cycle partiel laisse l'ancien horodatage en place et le signale.
+let lastOkTime = null, lastOkPartial = false;
+
+function renderMaj(){
+  const el = document.getElementById("maj");
+  if(!el) return;
+  if(lastOkTime == null){
+    el.className = "maj ko";
+    el.textContent = "Cotations indisponibles";
+    return;
+  }
+  const h = lastOkTime.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const ageMin = Math.floor((Date.now()-lastOkTime.getTime())/60000);
+  let age;
+  if(ageMin < 1)       age = "a l instant";
+  else if(ageMin < 60) age = "il y a "+ageMin+" min";
+  else                 age = "il y a "+Math.floor(ageMin/60)+" h "+String(ageMin%60).padStart(2,"0");
+  el.textContent = "Cotations a jour a "+h+"  -  "+age
+    + (lastOkPartial ? "  -  derniere tentative incomplete" : "");
+  // Au-dela de 3 min sans cycle complet (rafraichissement toutes les 60 s),
+  // l'onglet est gele ou les proxies repondent mal : on le signale en orange.
+  el.className = "maj" + (ageMin >= 3 ? " warn" : "");
+}
+
+function noteMaj(ok, tot){
+  if(ok === tot){ lastOkTime = new Date(); lastOkPartial = false; }
+  else { lastOkPartial = true; }
+  renderMaj();
+}
+
 // --- Cours live Yahoo via proxies CORS en cascade ---
 // Relais perso Cloudflare Worker, deploye le 22/07/2026. Place en tete de cascade
 // plus bas (MON_PROXY ? [...] : ...). Le suffixe /?url= fait partie de la valeur.
@@ -408,6 +444,7 @@ async function loadAll(){
     try{ yres[t.symbol]={t:t, q:await fetchYahoo(t.symbol)}; }
     catch(e){ yres[t.symbol]={t:t, err:e.message}; }
   }
+  noteMaj(MARKET.filter(function(t){ return yres[t.symbol] && yres[t.symbol].q; }).length, MARKET.length);
   // nav.json + history.json
   let data={}, hist={};
   try{
@@ -859,6 +896,7 @@ function drawFullChart(d){
 
 loadAll();
 setInterval(loadAll, 60000);
+setInterval(renderMaj, 30000);   // rafraichit le "il y a X min" sans reinterroger Yahoo
 </script>
 </body>
 </html>
