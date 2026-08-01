@@ -241,87 +241,146 @@
 // =======================================================
 //  PARAMETRES — modifie uniquement ici
 // =======================================================
-// Les quantites et les prix de revient ne sont plus saisis ici : ils sont calcules
-// a partir du JOURNAL DES APPORTS, fichier apports.csv, qui est le seul fichier a
-// editer a la main quand tu verses, arbitres ou vends.
-// Ce tableau ne fait que relier l intitule lisible utilise dans apports.csv au
-// code technique de la ligne (ISIN pour les fonds, ticker Yahoo pour les cotees).
-// Pour ajouter une nouvelle ligne au portefeuille : une entree ici + les apports
-// correspondants dans apports.csv (+ le fonds dans scraper.py s il n est pas cote).
-const LIGNES = {
-  "Actions Internationales ESR": "QS0009080175",
-  "Label Equilibre ESR":         "QS0009080746",
-  "Label Monetaire ESR":         "QS0009080720",
-  "Airbus":                      "AIR.PA",
-  "ETF MSCI World":              "WPEA.PA",
-  "ETF Asie Emergente":          "PAASI.PA",
-  "ASML":                        "ASML.AS",
-  "Amundi Euro Liquidity":       "FR0011408798",
-  "Carmignac Securite":          "FR0010149120",
-  "ODDO Global Target 2029":     "FR001400HHQ5",
-  "ETF Euro Corporate SRI":      "CC4.PA"
-};
-let QUANTITES = {};   // rempli par chargerApports() : somme algebrique des quantites
-let PRU = {};         // rempli par chargerApports() : cout moyen pondere des achats
-let APPORTS = [];     // journal brut, une entree par ligne utile de apports.csv
-let CSV_BRUT = "";    // contenu texte de apports.csv tel qu il est dans le depot
+// Ce fichier ne contient plus AUCUNE liste de valeurs. Tout vient de deux
+// fichiers texte du depot, lus au chargement :
+//
+//   supports.txt  la fiche d identite de chaque valeur : identifiant, enveloppe,
+//                 source de cotation, part actions, zone geographique.
+//                 On y touche quand une valeur entre ou sort du portefeuille.
+//
+//   apports.csv   le journal date des mouvements. Les quantites detenues et les
+//                 prix de revient en sont deduits, ils ne sont saisis nulle part.
+//
+// Les seules valeurs encore ecrites ici sont celles qui ne concernent aucune
+// valeur en particulier : le fonds euros, les cibles d allocation, la date de
+// reference des courbes.
+
+// --- Rempli par chargerSupports(), a partir de supports.txt ---
+let SUPPORTS  = [];   // [{nom, cle, enveloppe, source, url, actions, geo:{monde,euro,em}}]
+let PAR_CLE   = {};   // cle -> le support correspondant
+let LIGNES    = {};   // intitule -> cle (utilise par le journal et le formulaire)
+let ENVELOPPES= [];   // [{name:"PEG", keys:[...]}] dans l ordre du catalogue
+let MARKET    = [];   // supports cotes, a interroger chez Yahoo
+
+// --- Rempli par chargerApports(), a partir de apports.csv ---
+let QUANTITES = {};   // cle -> quantite detenue (somme algebrique du journal)
+let PRU       = {};   // cle -> prix de revient (moyenne ponderee des achats)
+let APPORTS   = [];   // le journal lui-meme, une entree par mouvement
+let CSV_BRUT  = "";   // texte de apports.csv tel qu il est dans le depot
 
 // Depot GitHub vise par l onglet de saisie (API Contents)
 const DEPOT      = "guermeurdaniel-cpu/mes-actions";
 const BRANCHE    = "main";
 const API_CONTENU= "https://api.github.com/repos/"+DEPOT+"/contents/apports.csv";
 
-const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
-const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
+// --- Assurance vie : le fonds euros n a pas de parts, il se saisit en montant ---
+const FONDS_EUROS       = 18135;   // valeur actuelle
+const FONDS_EUROS_VERSE = 18135;   // montant net verse (le gain est la difference)
 
 // Date de reference des courbes. Les apports anterieurs sont consideres en place
 // a cette date ; les apports posterieurs font monter le capital investi a leur date.
 const REF_DATE = "2026-06-16";
-// Enveloppes (sert au detail PMV et au cumul)
-const ENVELOPPES = [
-  {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720","AIR.PA"]},
-  {name:"PEA", keys:["WPEA.PA","PAASI.PA","ASML.AS"]},
-  {name:"AV",  keys:["FR0011408798","FR0010149120","FR001400HHQ5","CC4.PA"]}
-];
 
-// --- Synthese allocation actions / defensif : parametres ---
-const EQ_EQUILIBRE   = 0.50;   // part ACTIONS du fonds Amundi Label Equilibre ESR (bande de gestion 35-65%)
-const TARGET_ACTIONS = 0.70;   // cible actions du patrimoine consolide
-const BANDE          = 0.05;   // demi-bande de reequilibrage (0.05 = +/- 5 points)
-const EQUITY_FRACTION = {
-  "QS0009080175": 1.00,          // Amundi Actions Internationales ESR (actions monde)
-  "QS0009080746": EQ_EQUILIBRE,  // Amundi Label Equilibre ESR (mixte)
-  "QS0009080720": 0.00,          // Amundi Label Monetaire ESR
-  "AIR.PA":       1.00,          // Airbus SE (action)
-  "FR0011408798": 0.00,          // Amundi Euro Liquidity-Rated
-  "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
-  "FR001400HHQ5": 0.00,          // ODDO BHF Global Target IG 2029 (oblig datees)
-  "CC4.PA":       0.00,          // Amundi Euro Corporate SRI (oblig)
-  "WPEA.PA":      1.00,          // ETF MSCI World
-  "PAASI.PA":     1.00,          // ETF PEA Asie Emergente (actions)
-  "ASML.AS":      1.00           // ASML Holding (action)
-};
+// --- Cibles d allocation ---
+const TARGET_ACTIONS = 0.70;   // part actions visee sur le patrimoine consolide
+const BANDE          = 0.05;   // demi-bande de reequilibrage, en points
+const TARGET_EM      = 0.10;   // part emergents visee dans la poche actions
 
-// --- Repartition geographique des ACTIONS (par mandat d'indice) ---
-const TARGET_EM = 0.10;  // cible emergents en part de la poche actions (0.10 = 10%)
-const GEO_EQUITY = {
-  "QS0009080175": { world:1.00, euro:0.00, em:0.00 }, // benchmark MSCI World
-  "QS0009080746": { world:0.50, euro:0.50, em:0.00 }, // poche actions = 1/2 World + 1/2 zone euro
-  "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }, // MSCI World
-  "PAASI.PA":     { world:0.00, euro:0.00, em:1.00 }, // MSCI Emerging Asia (emergents)
-  "ASML.AS":      { world:1.00, euro:0.00, em:0.00 }, // ASML - classee Monde developpe
-  "AIR.PA":       { world:0.00, euro:1.00, em:0.00 }  // Airbus - action zone euro (CAC 40)
-};
+// Ordre d affichage des enveloppes, et intitule long correspondant
+const ORDRE_ENVELOPPES = ["PEG","PEA","AV"];
+
 // =======================================================
+//  CATALOGUE DES SUPPORTS (supports.txt)
+// =======================================================
+// Format : un bloc par support, ouvert par [Intitule], suivi de lignes nom = valeur.
+// Voir l en-tete de supports.txt pour le detail des champs.
 
-// Valeurs cotees Yahoo : groupe "peg", "pea" ou "av"
-const MARKET = [
-  { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
-  { symbol:"PAASI.PA",label:"ETF PEA Asie Emergente", group:"pea" },
-  { symbol:"ASML.AS", label:"ASML Holding",           group:"pea" },
-  { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" },
-  { symbol:"AIR.PA",  label:"Airbus SE",               group:"peg" }
-];
+// "monde 0.50 + euro 0.50" -> {monde:0.50, euro:0.50, em:0}
+function lireGeo(txt){
+  const g={monde:0, euro:0, em:0};
+  if(!txt) return g;
+  txt.split("+").forEach(function(part){
+    const m=part.trim().split(/\s+/);
+    const nom=(m[0]||"").toLowerCase();
+    const poids=(m.length>1)? (nombreFr(m[1])||0) : 1;
+    if(nom.indexOf("monde")===0)      g.monde+=poids;
+    else if(nom.indexOf("euro")===0)  g.euro +=poids;
+    else if(nom.indexOf("emerg")===0) g.em   +=poids;
+  });
+  return g;
+}
+
+function parserSupports(txt){
+  const liste=[], erreurs=[];
+  let courant=null;
+  txt.split(/\r?\n/).forEach(function(l, i){
+    const t=l.replace(/^\uFEFF/,"").trim();
+    if(!t || t.charAt(0)==="#") return;
+    const titre=t.match(/^\[(.+)\]$/);           // nouveau bloc
+    if(titre){
+      courant={nom:titre[1].trim(), cle:"", enveloppe:"", source:"", url:"",
+               actions:0, geo:{monde:0,euro:0,em:0}, ligne:i+1};
+      liste.push(courant);
+      return;
+    }
+    const sep=t.indexOf("=");
+    if(sep<0 || !courant){ erreurs.push("ligne "+(i+1)+" hors bloc ou sans ="); return; }
+    const champ=t.slice(0,sep).trim().toLowerCase();
+    const val=t.slice(sep+1).trim();
+    if(champ==="cle" || champ==="clé") courant.cle=val;
+    else if(champ==="enveloppe") courant.enveloppe=val.toUpperCase();
+    else if(champ==="source")    courant.source=val.toLowerCase();
+    else if(champ==="url")       courant.url=val;
+    else if(champ==="actions")   courant.actions=nombreFr(val)||0;
+    else if(champ==="geo")       courant.geo=lireGeo(val);
+    else erreurs.push("ligne "+(i+1)+" : champ inconnu \""+champ+"\"");
+  });
+  // Controles : mieux vaut un message clair qu un tableau de bord a zero
+  const vus={};
+  liste.forEach(function(s){
+    if(!s.cle) erreurs.push("["+s.nom+"] sans cle");
+    if(ORDRE_ENVELOPPES.indexOf(s.enveloppe)<0) erreurs.push("["+s.nom+"] enveloppe inconnue : "+s.enveloppe);
+    if(!s.source) erreurs.push("["+s.nom+"] sans source");
+    if((s.source==="abcbourse"||s.source==="boursier") && !s.url) erreurs.push("["+s.nom+"] source "+s.source+" sans url");
+    if(vus[s.cle]) erreurs.push("cle en double : "+s.cle);
+    vus[s.cle]=1;
+  });
+  return {liste:liste, erreurs:erreurs};
+}
+
+// Construit toutes les tables derivees a partir du catalogue
+function appliquerSupports(liste){
+  SUPPORTS=liste; PAR_CLE={}; LIGNES={}; MARKET=[]; ENVELOPPES=[];
+  const parEnv={};
+  liste.forEach(function(s){
+    PAR_CLE[s.cle]=s;
+    LIGNES[s.nom]=s.cle;
+    if(s.source==="yahoo") MARKET.push({symbol:s.cle, label:s.nom, group:s.enveloppe.toLowerCase()});
+    (parEnv[s.enveloppe]||(parEnv[s.enveloppe]=[])).push(s.cle);
+  });
+  ORDRE_ENVELOPPES.forEach(function(e){
+    if(parEnv[e]) ENVELOPPES.push({name:e, keys:parEnv[e]});
+  });
+}
+
+async function chargerSupports(){
+  try{
+    const r=await fetch("supports.txt?t="+Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const res=parserSupports(await r.text());
+    if(!res.liste.length) return {err:"supports.txt ne contient aucun support."};
+    appliquerSupports(res.liste);
+    return {err:null, erreurs:res.erreurs};
+  }catch(e){
+    return {err:"supports.txt illisible ("+e.message+") : rien ne peut etre affiche."};
+  }
+}
+
+// Raccourcis de lecture du catalogue, utilises partout dans la suite
+function estCote(cle){ const s=PAR_CLE[cle]; return !!s && s.source==="yahoo"; }
+function partActions(cle){ const s=PAR_CLE[cle]; return s? s.actions : 0; }
+function geoDe(cle){ const s=PAR_CLE[cle]; return s? s.geo : {monde:0,euro:0,em:0}; }
+function nomDe(cle){ const s=PAR_CLE[cle]; return s? s.nom : cle; }
 
 let pegTotal=0, avUC=0, peaTotal=0;
 let allCharts=[]; // registre des series pour la modale plein ecran
@@ -432,10 +491,12 @@ function investiA(date){
   });
   return c;
 }
-function afficherAlerteApports(jrn){
+function afficherAlerteApports(cat, jrn){
   const box=document.getElementById("alerteApports");
   if(!box) return;
   const msgs=[];
+  if(cat && cat.err) msgs.push(cat.err);
+  if(cat && cat.erreurs && cat.erreurs.length) msgs.push("supports.txt : "+cat.erreurs.join(" ; "));
   if(jrn.err) msgs.push(jrn.err);
   if(jrn.attente) msgs.push("Mouvement commite, republication du site en cours : l affichage utilise deja la version a jour.");
   if(jrn.inconnus.length) msgs.push("Intitules absents de LIGNES, apports ignores : "+jrn.inconnus.join(", "));
@@ -453,17 +514,17 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 // limitee a la fenetre reellement enregistree (report de la derniere VL connue, jamais de reconstruction du passe).
 function buildTotalSeries(data, hist, yres, costBasis){
   const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
-  for(const isin in data){
-    const f=data[isin];
-    if(f.category!=="PEG" && f.category!=="AV") continue;
-    const q=qtyOf(isin); if(!q) continue;
-    const h=hist[isin]||[];
-    if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(isin,e.date)*e.value;}) }); }
-    else if(f.value!=null){ series.push({ dates:[todayStr()], vals:[q*f.value] }); }
-  }
-  ["WPEA.PA","PAASI.PA","ASML.AS","CC4.PA","AIR.PA"].forEach(function(sym){
-    const y=yres[sym], q=qtyOf(sym);
-    if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(sym,y.q.dates[i])*c; }) }); }
+  // Une passe sur le catalogue : chaque support fournit sa serie, cotee ou non
+  SUPPORTS.forEach(function(sup){
+    const cle=sup.cle, q=qtyOf(cle); if(!q) return;
+    if(estCote(cle)){
+      const y=yres[cle];
+      if(y && y.q) series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });
+    } else {
+      const h=hist[cle]||[], f=data[cle];
+      if(h.length) series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
+      else if(f && f.value!=null) series.push({ dates:[todayStr()], vals:[q*f.value] });
+    }
   });
   if(!series.length) return null;
   // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
@@ -917,8 +978,10 @@ async function enregistrerMouvement(){
 async function loadAll(){
   pegTotal=0; avUC=0; peaTotal=0; allCharts=[];
   // Journal des apports d abord : il fournit QUANTITES et PRU a tout le reste
+  // Le catalogue d abord : sans lui on ne sait meme pas quoi aller chercher
+  const cat = await chargerSupports();
   const jrn = await chargerApports();
-  afficherAlerteApports(jrn);
+  afficherAlerteApports(cat, jrn);
   if(document.getElementById("vueSaisie").style.display!=="none") majSaisie();
   document.getElementById("peg").innerHTML='<div class="row"><div class="sub">Chargement...</div></div>';
   document.getElementById("refs").innerHTML="";
@@ -952,63 +1015,56 @@ async function loadAll(){
   for(const isin in data){ if(data[isin].status!=="not_found") scan((hist[isin]||[]).map(function(e){return e.value;})); }
   if(!isFinite(gmin)||!isFinite(gmax)||gmin===gmax){ gmin=95; gmax=105; }
 
-  // --- PEG (fonds Amundi ESR) ---
-  const pegBox=document.getElementById("peg"); pegBox.innerHTML="";
-  for(const isin in data){
-    const f=data[isin]; if(f.category!=="PEG") continue;
-    const row=document.createElement("div"); row.className="row";
-    if(f.value!=null){
-      const series=(hist[isin]||[]).map(function(e){return e.value;});
-      const dates=(hist[isin]||[]).map(function(e){return e.date;});
-      row.innerHTML=rowFund(f,series,dates,gmin,gmax);
-      pegTotal += qtyOf(isin)*f.value;
-    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
-    pegBox.appendChild(row);
-  }
-  // Airbus : ligne cotee (Yahoo), pas un fonds de nav.json
-  const air=yres["AIR.PA"];
-  if(air){
-    const rowAir=document.createElement("div"); rowAir.className="row";
-    if(air.q){ rowAir.innerHTML=rowYahoo({symbol:"AIR.PA",label:air.t.label,q:air.q},gmin,gmax); pegTotal += qtyOf("AIR.PA")*air.q.price; }
-    else { rowAir.innerHTML='<div class="info"><div class="nm">'+air.t.label+'</div><div class="err">'+air.err+'</div></div><svg class="spark"></svg>'; }
-    pegBox.appendChild(rowAir);
-  }
-  document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
+  // --- Affichage des trois enveloppes ---------------------------------------
+  // Une seule boucle pour les trois sections : le catalogue donne l ordre des
+  // supports et dit, pour chacun, s il faut lire le cours Yahoo ou la VL du fonds.
+  // Ajouter une valeur dans supports.txt suffit donc a la voir apparaitre ici.
+  const BOITES = { "PEG":"peg", "PEA":"refs", "AV":"av" };
+  const totaux = { "PEG":0, "PEA":0, "AV":0 };
 
-  // --- PEA (ETF Monde) ---
-  const refBox=document.getElementById("refs"); refBox.innerHTML="";
-  ["WPEA.PA","PAASI.PA","ASML.AS"].forEach(function(sym){
-    const it=yres[sym]; if(!it) return;
-    const row=document.createElement("div"); row.className="row";
-    if(it.q){ row.innerHTML=rowYahoo({symbol:sym,label:it.t.label,q:it.q},gmin,gmax); peaTotal += qtyOf(sym)*it.q.price; }
-    else { row.innerHTML='<div class="info"><div class="nm">'+it.t.label+'</div><div class="err">'+it.err+'</div></div><svg class="spark"></svg>'; }
-    refBox.appendChild(row);
+  ENVELOPPES.forEach(function(env){
+    const boite=document.getElementById(BOITES[env.name]);
+    if(!boite) return;
+    boite.innerHTML="";
+    env.keys.forEach(function(cle){
+      const row=document.createElement("div"); row.className="row";
+      if(estCote(cle)){
+        // Valeur cotee : cours du jour et historique viennent de Yahoo
+        const it=yres[cle];
+        if(it && it.q){
+          row.innerHTML=rowYahoo({symbol:cle, label:nomDe(cle), q:it.q}, gmin, gmax);
+          totaux[env.name] += qtyOf(cle)*it.q.price;
+        } else {
+          const msg=(it&&it.err)? it.err : "cours indisponible";
+          row.innerHTML='<div class="info"><div class="nm">'+nomDe(cle)+'</div><div class="err">'+msg+'</div></div><svg class="spark"></svg>';
+        }
+      } else {
+        // Fonds non cote : valeur liquidative issue de nav.json, historique de history.json
+        const f=data[cle];
+        if(f && f.value!=null){
+          const serie=(hist[cle]||[]).map(function(e){ return e.value; });
+          const dates=(hist[cle]||[]).map(function(e){ return e.date; });
+          row.innerHTML=rowFund({isin:cle, label:nomDe(cle), value:f.value, status:f.status}, serie, dates, gmin, gmax);
+          totaux[env.name] += qtyOf(cle)*f.value;
+        } else {
+          row.innerHTML='<div class="info"><div class="nm">'+nomDe(cle)+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>';
+        }
+      }
+      boite.appendChild(row);
+    });
   });
-  document.getElementById("totPea").innerHTML='<div class="tot pea"><div class="lbl">Total PEA</div><div class="amount">'+eur(peaTotal)+'</div></div>';
 
-  // --- Assurance vie ---
-  const avBox=document.getElementById("av"); avBox.innerHTML="";
-  for(const isin in data){
-    const f=data[isin]; if(f.category!=="AV") continue;
-    const row=document.createElement("div"); row.className="row";
-    if(f.value!=null){
-      const series=(hist[isin]||[]).map(function(e){return e.value;});
-      const dates=(hist[isin]||[]).map(function(e){return e.date;});
-      row.innerHTML=rowFund(f,series,dates,gmin,gmax);
-      avUC += qtyOf(isin)*f.value;
-    } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
-    avBox.appendChild(row);
+  // Le fonds euros n est pas un support : il se saisit en montant, en fin d assurance vie
+  const boiteAv=document.getElementById("av");
+  if(boiteAv){
+    const rowFE=document.createElement("div"); rowFE.className="row";
+    rowFE.innerHTML='<div class="info"><div class="nm">Fonds euros</div><div class="sub"><span class="pr">'+eur(FONDS_EUROS)+'</span><span class="held">'+eur(FONDS_EUROS)+'</span></div></div><svg class="spark"></svg>';
+    boiteAv.appendChild(rowFE);
   }
-  const cc4=yres["CC4.PA"];
-  if(cc4){
-    const row=document.createElement("div"); row.className="row";
-    if(cc4.q){ row.innerHTML=rowYahoo({symbol:"CC4.PA",label:cc4.t.label,q:cc4.q},gmin,gmax); avUC += qtyOf("CC4.PA")*cc4.q.price; }
-    else { row.innerHTML='<div class="info"><div class="nm">'+cc4.t.label+'</div><div class="err">'+cc4.err+'</div></div><svg class="spark"></svg>'; }
-    avBox.appendChild(row);
-  }
-  const rowFE=document.createElement("div"); rowFE.className="row";
-  rowFE.innerHTML='<div class="info"><div class="nm">Fonds euros</div><div class="sub"><span class="pr">'+eur(FONDS_EUROS)+'</span><span class="held">'+eur(FONDS_EUROS)+'</span></div></div><svg class="spark"></svg>';
-  avBox.appendChild(rowFE);
+
+  pegTotal=totaux["PEG"]; peaTotal=totaux["PEA"]; avUC=totaux["AV"];
+  document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
+  document.getElementById("totPea").innerHTML='<div class="tot pea"><div class="lbl">Total PEA</div><div class="amount">'+eur(peaTotal)+'</div></div>';
 
   const avTotal = avUC + FONDS_EUROS;
   const ratio = avTotal>0 ? avUC/avTotal*100 : 0;
@@ -1119,24 +1175,30 @@ async function loadAll(){
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
     function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
-    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="ASML.AS"||k==="CC4.PA"||k==="AIR.PA")? valYahoo(k) : valFund(k); }
+    // Chaque support sait s il est cote ou non : le catalogue tranche, pas une liste en dur
+    function holdingEur(k){ return estCote(k)? valYahoo(k) : valFund(k); }
     var actions=0, defensif=0, total=0;
-    for(var k in EQUITY_FRACTION){
-      var v=holdingEur(k); if(!v) continue;
-      var eq=v*EQUITY_FRACTION[k];
+    SUPPORTS.forEach(function(sup){
+      var v=holdingEur(sup.cle); if(!v) return;
+      var eq=v*sup.actions;
       actions+=eq; defensif+=v-eq; total+=v;
-    }
+    });
     defensif+=FONDS_EUROS; total+=FONDS_EUROS;   // fonds euros = 100% defensif
-    var euroEqEquilibre = valFund("QS0009080746")*0.25;  // poche MSCI EMU du fonds Equilibre
+    // Poche zone euro apportee par les fonds mixtes (actions x part euro de leur geo)
+    var euroEqEquilibre=0;
+    SUPPORTS.forEach(function(sup){
+      if(sup.actions>0 && sup.actions<1) euroEqEquilibre += holdingEur(sup.cle)*sup.actions*sup.geo.euro;
+    });
     var pAct = total>0? actions/total : 0;
     var drift = pAct - TARGET_ACTIONS;
     var inBand = Math.abs(drift) <= BANDE;
     var moveEur = Math.abs(drift)*total;
+    // Repartition geographique : on ne repartit que la poche actions de chaque support
     var gw=0, ge=0, gm=0;
-    for(var g in GEO_EQUITY){
-      var ve=holdingEur(g)*(EQUITY_FRACTION[g]||0); if(!ve) continue;
-      gw+=ve*GEO_EQUITY[g].world; ge+=ve*GEO_EQUITY[g].euro; gm+=ve*GEO_EQUITY[g].em;
-    }
+    SUPPORTS.forEach(function(sup){
+      var ve=holdingEur(sup.cle)*sup.actions; if(!ve) return;
+      gw+=ve*sup.geo.monde; ge+=ve*sup.geo.euro; gm+=ve*sup.geo.em;
+    });
     var geoTot=(gw+ge+gm)||1;
     var gwP=gw/geoTot*100, geP=ge/geoTot*100, gmP=gm/geoTot*100;
     var geoHtml=
