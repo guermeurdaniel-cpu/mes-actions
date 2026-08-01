@@ -95,10 +95,14 @@
   .multi-read .mr-row .mr-nm { display:flex; align-items:center; gap:6px; min-width:0; }
   .multi-read .mr-row .mr-nm .dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
   .multi-read .mr-row .mr-nm span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .alerte { background:#3a2410; border:1px solid #ff9f0a; color:#ffd479; border-radius:12px;
+            padding:10px 12px; margin:0 0 12px; font-size:13px; line-height:1.45; }
 </style>
 </head>
 <body>
   <h1>Mes valeurs</h1>
+
+  <div id="alerteApports"></div>
 
   <div id="synth"></div>
 
@@ -139,43 +143,39 @@
 // =======================================================
 //  PARAMETRES — modifie uniquement ici
 // =======================================================
-const QUANTITES = {
-  // PEG (fonds Amundi ESR)
-  "QS0009080175": 1156.7167 + 941.2472 + 88.2604+22.898,  // tranche PEG + tranche PER actions internationales Esr f
-  "QS0009080746": 75.4236,// Amundi label equilibre
-  "QS0009080720": 9.4187+1.0326,// Amundi label monetaire
-  // Assurance vie - unites de compte
-  "FR0011408798": 0.3054,
-  "FR0010149120": 1.6917,
-  "FR001400HHQ5": 0.2720,   // ODDO BHF Global Target IG 2029 (fonds obligataire date)
-  "CC4.PA": 14.3676,        // ETF Amundi Euro Corporate SRI (LU1681039647)
-  // PEA
-  "WPEA.PA": 6157,
-  "PAASI.PA": 355,         // ETF Amundi PEA Asie Emergente (FR0013412012)
-  "ASML.AS": 3            // ASML Holding (NL0010273215) - Euronext Amsterdam
+// Les quantites et les prix de revient ne sont plus saisis ici : ils sont calcules
+// a partir du JOURNAL DES APPORTS, fichier apports.csv, qui est le seul fichier a
+// editer a la main quand tu verses, arbitres ou vends.
+// Ce tableau ne fait que relier l intitule lisible utilise dans apports.csv au
+// code technique de la ligne (ISIN pour les fonds, ticker Yahoo pour les cotees).
+// Pour ajouter une nouvelle ligne au portefeuille : une entree ici + les apports
+// correspondants dans apports.csv (+ le fonds dans scraper.py s il n est pas cote).
+const LIGNES = {
+  "Actions Internationales ESR": "QS0009080175",
+  "Label Equilibre ESR":         "QS0009080746",
+  "Label Monetaire ESR":         "QS0009080720",
+  "Airbus":                      "AIR.PA",
+  "ETF MSCI World":              "WPEA.PA",
+  "ETF Asie Emergente":          "PAASI.PA",
+  "ASML":                        "ASML.AS",
+  "Amundi Euro Liquidity":       "FR0011408798",
+  "Carmignac Securite":          "FR0010149120",
+  "ODDO Global Target 2029":     "FR001400HHQ5",
+  "ETF Euro Corporate SRI":      "CC4.PA"
 };
+let QUANTITES = {};   // rempli par chargerApports() : somme algebrique des quantites
+let PRU = {};         // rempli par chargerApports() : cout moyen pondere des achats
+let APPORTS = [];     // journal brut, une entree par ligne utile de apports.csv
+
 const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
 const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
 
-// --- Prix de revient (PRU) par part + date de reference commune ---
-// Tout (cumul, courbe, PMV) est ancre au 16/06/2026. Pour les fonds PEG sans PRU reel,
-// la valeur de depart figee est la VL du 16/06. Ligne absente de PRU -> repli 1re VL enregistree.
+// Date de reference des courbes. Les apports anterieurs sont consideres en place
+// a cette date ; les apports posterieurs font monter le capital investi a leur date.
 const REF_DATE = "2026-06-16";
-const PRU = {
-  "WPEA.PA":      6.78,
-  "PAASI.PA":     39.70,
-  "ASML.AS":      1553.53,      // ASML Holding - PRU
-  // Actions Inter. ESR : tranche PER (941,2472 a 38,68) + tranche PEG (1156,7167, depart 16/06 a 39,07)
-  "QS0009080175": (941.2472*38.68 + 1156.7167*39.07 + 88.2604*39.56+22.898*39.51)/(941.2472+1156.7167+88.2604+22.898),
-  "QS0009080746": 326.83,      // Equilibre ESR - valeur de depart 16/06/2026
-  "QS0009080720": 1308.6031,   // Monetaire ESR - valeur de depart 16/06/2026
-  "FR0011408798": 10885.40,    // Amundi Euro Liquidity-Rated (PRU post-arbitrage 07/2026)
-  "FR0010149120": 1924.08,     // Carmignac Securite
-  "CC4.PA":       226.55       // Amundi Euro Corporate SRI ETF
-};
 // Enveloppes (sert au detail PMV et au cumul)
 const ENVELOPPES = [
-  {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720"]},
+  {name:"PEG", keys:["QS0009080175","QS0009080746","QS0009080720","AIR.PA"]},
   {name:"PEA", keys:["WPEA.PA","PAASI.PA","ASML.AS"]},
   {name:"AV",  keys:["FR0011408798","FR0010149120","FR001400HHQ5","CC4.PA"]}
 ];
@@ -188,6 +188,7 @@ const EQUITY_FRACTION = {
   "QS0009080175": 1.00,          // Amundi Actions Internationales ESR (actions monde)
   "QS0009080746": EQ_EQUILIBRE,  // Amundi Label Equilibre ESR (mixte)
   "QS0009080720": 0.00,          // Amundi Label Monetaire ESR
+  "AIR.PA":       1.00,          // Airbus SE (action)
   "FR0011408798": 0.00,          // Amundi Euro Liquidity-Rated
   "FR0010149120": 0.00,          // Carmignac Securite (oblig court terme)
   "FR001400HHQ5": 0.00,          // ODDO BHF Global Target IG 2029 (oblig datees)
@@ -204,7 +205,8 @@ const GEO_EQUITY = {
   "QS0009080746": { world:0.50, euro:0.50, em:0.00 }, // poche actions = 1/2 World + 1/2 zone euro
   "WPEA.PA":      { world:1.00, euro:0.00, em:0.00 }, // MSCI World
   "PAASI.PA":     { world:0.00, euro:0.00, em:1.00 }, // MSCI Emerging Asia (emergents)
-  "ASML.AS":      { world:1.00, euro:0.00, em:0.00 }  // ASML - classee Monde developpe
+  "ASML.AS":      { world:1.00, euro:0.00, em:0.00 }, // ASML - classee Monde developpe
+  "AIR.PA":       { world:0.00, euro:1.00, em:0.00 }  // Airbus - action zone euro (CAC 40)
 };
 // =======================================================
 
@@ -213,7 +215,8 @@ const MARKET = [
   { symbol:"WPEA.PA", label:"ETF MSCI World",         group:"pea" },
   { symbol:"PAASI.PA",label:"ETF PEA Asie Emergente", group:"pea" },
   { symbol:"ASML.AS", label:"ASML Holding",           group:"pea" },
-  { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" }
+  { symbol:"CC4.PA",  label:"Amundi Euro Corp SRI ETF", group:"av" },
+  { symbol:"AIR.PA",  label:"Airbus SE",               group:"peg" }
 ];
 
 let pegTotal=0, avUC=0, peaTotal=0;
@@ -221,6 +224,88 @@ let allCharts=[]; // registre des series pour la modale plein ecran
 
 function eur(v){ return v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR"; }
 function qtyOf(k){ return QUANTITES[k] || 0; }
+
+// =======================================================
+//  JOURNAL DES APPORTS (apports.csv)
+// =======================================================
+// Format d une ligne utile :  date ; intitule ; quantite ; prix unitaire
+//   - separateur point-virgule ; lignes vides et lignes commencant par # ignorees
+//   - la virgule decimale est acceptee (39,07 aussi bien que 39.07)
+//   - quantite NEGATIVE = vente ou arbitrage sortant : la quantite baisse et le
+//     prix de revient des parts restantes n est pas modifie (methode du PRU)
+//   - prix laisse vide = inconnu : la ligne compte dans la quantite mais pas
+//     dans le PRU ; la PMV de cette ligne repart alors de sa 1re VL enregistree
+function nombreFr(s){
+  if(s==null) return null;
+  s=String(s).trim().replace(/\s/g,"").replace(/\u00a0/g,"").replace(/€/g,"").replace(/EUR/gi,"");
+  if(!s) return null;
+  const v=parseFloat(s.replace(",","."));
+  return isFinite(v)? v : null;
+}
+async function chargerApports(){
+  QUANTITES={}; PRU={}; APPORTS=[];
+  const inconnus=[], malformes=[];
+  let txt="";
+  try{
+    const r=await fetch("apports.csv?t="+Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    txt=await r.text();
+  }catch(e){
+    return {err:"apports.csv illisible ("+e.message+") : toutes les quantites sont a zero.", inconnus:inconnus, malformes:malformes};
+  }
+  const achats={};   // cle -> {qte, cout} : achats seuls, pour le PRU
+  txt.split(/\r?\n/).forEach(function(l, i){
+    const brut=l.replace(/^\uFEFF/,"").trim();
+    if(!brut || brut.charAt(0)==="#") return;
+    const c=brut.split(";");
+    const nom=(c[1]||"").trim();
+    const q=nombreFr(c[2]);
+    const p=(c.length>3)? nombreFr(c[3]) : null;
+    if(c.length<3 || !nom || q===null){ malformes.push(i+1); return; }
+    const cle=LIGNES[nom];
+    if(!cle){ if(inconnus.indexOf(nom)<0) inconnus.push(nom); return; }
+    APPORTS.push({date:(c[0]||"").trim(), nom:nom, cle:cle, qte:q, prix:p});
+    QUANTITES[cle]=(QUANTITES[cle]||0)+q;
+    if(q>0 && p!==null){
+      const a=achats[cle]||(achats[cle]={qte:0, cout:0});
+      a.qte+=q; a.cout+=q*p;
+    }
+  });
+  for(const cle in achats){ if(achats[cle].qte>0) PRU[cle]=achats[cle].cout/achats[cle].qte; }
+  APPORTS.sort(function(a,b){ return a.date<b.date? -1 : (a.date>b.date? 1 : 0); });
+  return {err:null, inconnus:inconnus, malformes:malformes};
+}
+// Quantite reellement detenue sur une ligne a une date donnee : indispensable
+// pour que les courbes ne fassent pas apparaitre un apport recent comme une
+// performance passee.
+function qteA(cle, date){
+  let q=0;
+  APPORTS.forEach(function(a){
+    if(a.cle!==cle) return;
+    if(!a.date || a.date<=date) q+=a.qte;
+  });
+  return q;
+}
+// Capital investi a une date donnee = apports nets deja verses a cette date,
+// fonds euros compris. Sert a separer ce qui vient des versements de ce qui
+// vient de la performance.
+function investiA(date){
+  let c=FONDS_EUROS_VERSE;
+  APPORTS.forEach(function(a){
+    if(a.prix===null) return;              // prix inconnu : non comptabilise
+    if(!a.date || a.date<=date) c+=a.qte*a.prix;
+  });
+  return c;
+}
+function afficherAlerteApports(jrn){
+  const box=document.getElementById("alerteApports");
+  if(!box) return;
+  const msgs=[];
+  if(jrn.err) msgs.push(jrn.err);
+  if(jrn.inconnus.length) msgs.push("Intitules absents de LIGNES, apports ignores : "+jrn.inconnus.join(", "));
+  if(jrn.malformes.length) msgs.push("Lignes mal formees dans apports.csv (numeros) : "+jrn.malformes.join(", "));
+  box.innerHTML = msgs.length? '<div class="alerte">'+msgs.join("<br>")+'</div>' : "";
+}
 // Cout de revient d'une ligne (qte x PRU). null si pas de PRU connu -> repli sur la variation de marche.
 function lineCost(k){ return (PRU[k]!=null) ? qtyOf(k)*PRU[k] : null; }
 
@@ -237,12 +322,12 @@ function buildTotalSeries(data, hist, yres, costBasis){
     if(f.category!=="PEG" && f.category!=="AV") continue;
     const q=qtyOf(isin); if(!q) continue;
     const h=hist[isin]||[];
-    if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return q*e.value;}) }); }
+    if(h.length){ series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(isin,e.date)*e.value;}) }); }
     else if(f.value!=null){ series.push({ dates:[todayStr()], vals:[q*f.value] }); }
   }
-  ["WPEA.PA","PAASI.PA","ASML.AS","CC4.PA"].forEach(function(sym){
+  ["WPEA.PA","PAASI.PA","ASML.AS","CC4.PA","AIR.PA"].forEach(function(sym){
     const y=yres[sym], q=qtyOf(sym);
-    if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c){return q*c;}) }); }
+    if(y&&y.q&&q){ series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(sym,y.q.dates[i])*c; }) }); }
   });
   if(!series.length) return null;
   // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
@@ -434,6 +519,9 @@ function rowFund(f, series, dates, gmin, gmax){
 
 async function loadAll(){
   pegTotal=0; avUC=0; peaTotal=0; allCharts=[];
+  // Journal des apports d abord : il fournit QUANTITES et PRU a tout le reste
+  const jrn = await chargerApports();
+  afficherAlerteApports(jrn);
   document.getElementById("peg").innerHTML='<div class="row"><div class="sub">Chargement...</div></div>';
   document.getElementById("refs").innerHTML="";
   document.getElementById("av").innerHTML="";
@@ -478,6 +566,14 @@ async function loadAll(){
       pegTotal += qtyOf(isin)*f.value;
     } else { row.innerHTML='<div class="info"><div class="nm">'+f.label+'</div><div class="err">VL indisponible</div></div><svg class="spark"></svg>'; }
     pegBox.appendChild(row);
+  }
+  // Airbus : ligne cotee (Yahoo), pas un fonds de nav.json
+  const air=yres["AIR.PA"];
+  if(air){
+    const rowAir=document.createElement("div"); rowAir.className="row";
+    if(air.q){ rowAir.innerHTML=rowYahoo({symbol:"AIR.PA",label:air.t.label,q:air.q},gmin,gmax); pegTotal += qtyOf("AIR.PA")*air.q.price; }
+    else { rowAir.innerHTML='<div class="info"><div class="nm">'+air.t.label+'</div><div class="err">'+air.err+'</div></div><svg class="spark"></svg>'; }
+    pegBox.appendChild(rowAir);
   }
   document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
 
@@ -579,17 +675,19 @@ async function loadAll(){
       });
     });
     contribHtml=
-      '<div class="contrib"><div class="cb-head">Detail par ligne (PMV depuis le 16/06)</div>'
+      '<div class="contrib"><div class="cb-head">Detail par ligne (PMV vs apports)</div>'
       +body
-      +'<div class="cb-foot">Gain / perte par ligne depuis le PRU, % rapporte au total du jour ; somme = PMV totale.</div></div>';
+      +'<div class="cb-foot">Gain / perte par ligne = valeur du jour moins apports (PRU du journal), % rapporte au total du jour ; somme = PMV totale.</div></div>';
   }
 
-  // --- Patrimoine consolide : courbe en % de PMV (ancree 16/06) + courbe patrimoine reel (EUR) ---
+  // --- Patrimoine consolide : courbe de PMV en % du capital investi + courbes EUR ---
   let totalChartIdx=-1, realChartIdx=-1, progHtml="";
-  const totalSeries=buildTotalSeries(data,hist,yres,pmv.totCost);
+  const totalSeries=buildTotalSeries(data,hist,yres,investiA(REF_DATE));
   if(totalSeries && totalSeries.values.length>=2 && pmv.totCost>0){
     const td=totalSeries.dates;
-    const pct=totalSeries.values.map(function(v){ return (v/pmv.totCost-1)*100; });
+    // % rapporte au capital reellement investi A CETTE DATE : un apport fait en
+    // cours de route ne se lit donc pas comme une performance
+    const pct=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return c>0? (v/c-1)*100 : 0; });
     totalChartIdx=allCharts.length;
     // compareValues : serie EUR conservee pour le comparateur base 100 (une serie en % ne peut pas etre re-basee a 100)
     allCharts.push({label:"Patrimoine total (PMV en %)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
@@ -599,6 +697,10 @@ async function loadAll(){
     const rv=patHist.map(function(e){return e.valeur;});
     realChartIdx=allCharts.length;
     allCharts.push({label:"Patrimoine reel (EUR)", dates:patHist.map(function(e){return e.date;}), values:rv, up:(rv[rv.length-1]>=rv[0]), unit:"EUR"});
+    // Capital investi : marche d escalier des apports, a comparer au patrimoine reel
+    const pd=patHist.map(function(e){return e.date;});
+    const inv=pd.map(function(d){ return investiA(d); });
+    allCharts.push({label:"Capital investi (EUR)", dates:pd, values:inv, up:true, unit:"EUR"});
   }
   // Le cumul affiche en haut = la PMV (calcul PRU), pas la variation brute de la courbe.
   if(pmv.totDay>0){
@@ -610,7 +712,7 @@ async function loadAll(){
       '<div class="prog"'+clickable+'>'
       +'<span class="pct '+cl+'">'+sg+totPct.toFixed(2)+'%</span>'
       +'<span class="eurd '+cl+'">'+sg+eur(pmv.totGain)+'</span>'
-      +'<span class="since">PMV depuis le 16/06</span>'
+      +'<span class="since">PMV vs apports</span>'
       +(totalChartIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')
       +(realChartIdx>=0?'<span class="tap" onclick="event.stopPropagation();openFullChart('+realChartIdx+')">&#9654; patrimoine EUR</span>':'')+'</div>';
   }
@@ -619,7 +721,7 @@ async function loadAll(){
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
     function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
-    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="ASML.AS"||k==="CC4.PA")? valYahoo(k) : valFund(k); }
+    function holdingEur(k){ return (k==="WPEA.PA"||k==="PAASI.PA"||k==="ASML.AS"||k==="CC4.PA"||k==="AIR.PA")? valYahoo(k) : valFund(k); }
     var actions=0, defensif=0, total=0;
     for(var k in EQUITY_FRACTION){
       var v=holdingEur(k); if(!v) continue;
@@ -656,6 +758,7 @@ async function loadAll(){
       +'<div class="big">'+eur(total)+'</div>'
       +progHtml
       +contribHtml
+      +'<div class="meta">Apports cumules '+eur(pmv.totCost)+'  -  Plus-value '+(pmv.totGain>=0?'+':'')+eur(pmv.totGain)+'</div>'
       +'<div class="meta">Actions '+eqW+'%  -  Defensif '+dfW+'%  -  ecart cible '+(drift>=0?'+':'')+(drift*100).toFixed(1)+' pts</div>'
       +'<div class="bar"><div class="eq" style="width:'+eqW+'%"></div><div class="df" style="width:'+dfW+'%"></div><div class="tgt" style="left:'+tgtLeft+'%"></div></div>'
       +'<div class="legend2"><span style="color:#30d158">Actions '+eur(actions)+'</span><span style="color:#0a84ff">Defensif '+eur(defensif)+'</span></div>'
