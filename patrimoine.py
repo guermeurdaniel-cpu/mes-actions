@@ -4,8 +4,9 @@ patrimoine.py — Enregistre chaque jour la valeur REELLE du patrimoine global
 dans patrimoine.json (liste de {date, valeur}).
 
 Sources :
-  - apports.csv : journal des apports (source de verite des quantites, editee a la main)
-  - index.html  : table LIGNES (intitule -> ISIN/ticker) + FONDS_EUROS
+  - supports.txt : catalogue des valeurs (intitule, cle, source de cotation)
+  - apports.csv  : journal des apports, d ou sont deduites les quantites detenues
+  - index.html   : uniquement le montant du fonds euros
   - nav.json   : dernieres VL des fonds (Amundi, Carmignac, ODDO)
   - Yahoo Finance (cote serveur, pas de CORS) : WPEA.PA, PAASI.PA, ASML.AS, CC4.PA
 
@@ -19,37 +20,37 @@ import datetime
 
 from curl_cffi import requests as creq
 
-YAHOO_SYMBOLS = ["WPEA.PA", "PAASI.PA", "ASML.AS", "CC4.PA", "AIR.PA"]
+import supports as supports_mod
+
+# Les valeurs cotees viennent du catalogue : rien a tenir a jour ici.
+SUPPORTS = supports_mod.lire()
+YAHOO_SYMBOLS = supports_mod.cotes(SUPPORTS)
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
 
 
-def lire_lignes(chemin="index.html"):
-    """Extrait la table LIGNES (intitule lisible -> ISIN ou ticker) depuis index.html."""
+def lire_fonds_euros(chemin="index.html"):
+    """Le fonds euros n a pas de parts : son montant est saisi dans index.html."""
     with open(chemin, "r", encoding="utf-8") as f:
         html = f.read()
-
-    m = re.search(r"const\s+LIGNES\s*=\s*\{(.*?)\};", html, re.S)
+    m = re.search(r"const\s+FONDS_EUROS\s*=\s*([\d.]+)", html)
     if not m:
-        raise RuntimeError("Bloc LIGNES introuvable dans index.html")
-    lignes = dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', m.group(1)))
-    if not lignes:
-        raise RuntimeError("Bloc LIGNES vide")
-    return lignes
+        raise RuntimeError("FONDS_EUROS introuvable dans index.html")
+    return float(m.group(1))
 
 
 def nombre_fr(txt):
     """Convertit '39,07' ou '39.07' en float. Chaine vide -> None."""
-    t = (txt or "").strip().replace("\u00a0", "").replace(" ", "").replace("EUR", "").replace("€", "")
+    t = (txt or "").strip().replace("\u00a0", "").replace(" ", "").replace("EUR", "").replace("\u20ac", "")
     if not t:
         return None
     return float(t.replace(",", "."))
 
 
-def lire_apports(lignes, chemin="apports.csv"):
-    """Somme les quantites du journal des apports, par ISIN / ticker.
+def lire_apports(intitules, chemin="apports.csv"):
+    """Somme les quantites du journal des apports, par cle de support.
 
     Format : date ; intitule ; quantite ; prix   (# = commentaire)
-    Quantite negative = vente : elle diminue simplement la quantite detenue.
+    Une quantite negative est une vente : elle diminue simplement la quantite.
     """
     quantites = {}
     with open(chemin, "r", encoding="utf-8-sig") as f:
@@ -62,28 +63,13 @@ def lire_apports(lignes, chemin="apports.csv"):
                 raise RuntimeError("apports.csv ligne %d : moins de 3 champs" % num)
             nom = champs[1].strip()
             qte = nombre_fr(champs[2])
-            if nom not in lignes:
-                raise RuntimeError("apports.csv ligne %d : intitule inconnu '%s'" % (num, nom))
+            if nom not in intitules:
+                raise RuntimeError("apports.csv ligne %d : intitule absent de supports.txt : '%s'" % (num, nom))
             if qte is None:
                 raise RuntimeError("apports.csv ligne %d : quantite absente" % num)
-            cle = lignes[nom]
+            cle = intitules[nom]
             quantites[cle] = quantites.get(cle, 0.0) + qte
     return quantites
-
-
-def lire_fonds_euros(chemin="index.html"):
-    with open(chemin, "r", encoding="utf-8") as f:
-        html = f.read()
-    m = re.search(r"const\s+FONDS_EUROS\s*=\s*([\d.]+)", html)
-    if not m:
-        raise RuntimeError("FONDS_EUROS introuvable dans index.html")
-    return float(m.group(1))
-
-
-def lire_quantites_et_fonds_euros(chemin="index.html"):
-    """Quantites detenues (depuis apports.csv) et fonds euros (depuis index.html)."""
-    lignes = lire_lignes(chemin)
-    return lire_apports(lignes), lire_fonds_euros(chemin)
 
 
 def prix_yahoo(sym):
@@ -99,7 +85,8 @@ def prix_yahoo(sym):
 
 
 def main():
-    quantites, fonds_euros = lire_quantites_et_fonds_euros()
+    quantites = lire_apports(supports_mod.par_intitule(SUPPORTS))
+    fonds_euros = lire_fonds_euros()
 
     with open("nav.json", "r", encoding="utf-8") as f:
         nav = json.load(f)
