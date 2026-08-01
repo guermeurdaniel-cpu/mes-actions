@@ -8,6 +8,7 @@
 #     ("Valeur liquidative / Au JJ/MM/AAAA / 39,51 EUR"). Le navigateur n'est lance que si
 #     la voie 1 echoue (cout paye uniquement en cas de besoin).
 #  3) Dernier filet : reprise de la derniere VL connue (status "ancien").
+#  Les valeurs a recuperer sont lues dans supports.txt (catalogue partage).
 #  - Fonds PEG (QS...) : API JSON interne Amundi EE  /product-services/fdr/share/v3/full/{ISIN}
 #                        -> champ lastNav.value (nombre) et lastNav.date (ISO AAAA-MM-JJ)
 #  - Fonds AV  (FR...) : page abcbourse.com, VL lue dans le HTML servi.
@@ -17,18 +18,13 @@ import json, re, os, datetime, time
 # Necessaire car l'API Amundi filtre par empreinte TLS (405 avec requests, 200 en navigateur).
 from curl_cffi import requests
 
-FONDS = [
-    { "isin":"QS0009080175", "label":"Amundi Actions Internationales ESR - F", "category":"PEG", "source":"amundi-api" },
-    { "isin":"QS0009080746", "label":"Amundi Label Equilibre ESR - F",         "category":"PEG", "source":"amundi-api" },
-    { "isin":"QS0009080720", "label":"Amundi Label Monetaire ESR - F",         "category":"PEG", "source":"amundi-api" },
-    { "isin":"FR0011408798", "label":"Amundi Euro Liquidity-Rated", "category":"AV",
-      "source":"amundi-api", "endpoint":"amundi-fr" },
-    { "isin":"FR0010149120", "label":"Carmignac Securite AW EUR", "category":"AV",
-      "source":"abcbourse",
-      "url":"https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120" },
-    { "isin":"FR001400HHQ5", "label":"ODDO BHF Global Target IG 2029", "category":"AV", "source":"boursier",
-      "url":"https://www.boursier.com/opcvm/cours/oddo-bhf-global-target-ig-2029-cr-eur-FR001400HHQ5,FR.html" },
-]
+import supports as supports_mod
+
+# La liste des valeurs n est plus ecrite ici : elle vient de supports.txt, le
+# catalogue partage avec le tableau de bord et avec patrimoine.py. On ne garde
+# que les supports non cotes, les valeurs cotees etant lues en direct chez Yahoo.
+FONDS = supports_mod.fonds(supports_mod.lire())
+
 OUT = "nav.json"; HIST = "history.json"
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -304,39 +300,44 @@ def last_known(history, isin):
 def main():
     results={}; history=load_json(HIST,{})
     for f in FONDS:
-        if f["source"]=="amundi-api":
-            ep = f.get("endpoint","amundi-ee")
-            value,nav_date=scrape_amundi_api(f["isin"], ep)
-            if value is None and ep=="amundi-ee":
-                # repli Playwright uniquement pour les fonds epargne salariale
-                print(f"[robot]   API KO -> repli Playwright pour {f['isin']}")
-                value,nav_date=scrape_amundi_playwright(f["isin"])
-            elif value is None and ep=="amundi-fr":
-                # repli abcbourse pour les fonds AV Amundi
-                print(f"[robot]   amundi.fr KO -> repli abcbourse pour {f['isin']}")
-                value,nav_date=scrape_abcbourse(
-                    f"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_s{f['isin']}")
-        elif f["source"]=="boursier":
-            value,nav_date=scrape_boursier(f["url"])
+        isin  = f["cle"]          # pour un fonds non cote, la cle est l ISIN
+        label = f["nom"]          # meme intitule que dans supports.txt et apports.csv
+        categ = f["enveloppe"]
+        src   = f["source"]
+
+        if src in ("amundi-ee", "amundi-fr"):
+            value, nav_date = scrape_amundi_api(isin, src)
+            if value is None and src == "amundi-ee":
+                # repli Playwright, uniquement pour les fonds epargne salariale
+                print(f"[robot]   API KO -> repli Playwright pour {isin}")
+                value, nav_date = scrape_amundi_playwright(isin)
+            elif value is None and src == "amundi-fr":
+                # repli abcbourse pour les fonds Amundi grand public
+                print(f"[robot]   amundi.fr KO -> repli abcbourse pour {isin}")
+                value, nav_date = scrape_abcbourse(
+                    f"https://www.abcbourse.com/opcvm/amundi-euro-liquidity-rated-sri-e-c_s{isin}")
+        elif src == "boursier":
+            value, nav_date = scrape_boursier(f["url"])
         else:
-            value,nav_date=scrape_abcbourse(f["url"])
+            value, nav_date = scrape_abcbourse(f["url"])
 
         if value is not None:
             date = nav_date or datetime.date.today().isoformat()
-            results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                "value":value,"currency":"EUR","date":date,"status":"ok"}
-            merge_history(history,f["isin"],date,value)
+            results[isin] = {"isin": isin, "label": label, "category": categ,
+                             "value": value, "currency": "EUR", "date": date, "status": "ok"}
+            merge_history(history, isin, date, value)
         else:
-            old_val, old_date = last_known(history, f["isin"])
+            old_val, old_date = last_known(history, isin)
             if old_val is not None:
                 print(f"[robot]   -> reprise derniere VL connue : {old_val} ({old_date})")
-                results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                    "value":old_val,"currency":"EUR","date":old_date,"status":"ancien"}
+                results[isin] = {"isin": isin, "label": label, "category": categ,
+                                 "value": old_val, "currency": "EUR", "date": old_date, "status": "ancien"}
             else:
-                results[f["isin"]]={"isin":f["isin"],"label":f["label"],"category":f["category"],
-                    "value":None,"currency":"EUR","date":datetime.date.today().isoformat(),"status":"not_found"}
+                results[isin] = {"isin": isin, "label": label, "category": categ,
+                                 "value": None, "currency": "EUR",
+                                 "date": datetime.date.today().isoformat(), "status": "not_found"}
 
-        print(f"[robot] {f['isin']} -> {results[f['isin']]}")
+        print(f"[robot] {isin} -> {results[isin]}")
     _playwright_close()
     with open(OUT,"w",encoding="utf-8") as fh: json.dump(results,fh,ensure_ascii=False,indent=2)
     with open(HIST,"w",encoding="utf-8") as fh: json.dump(history,fh,ensure_ascii=False,indent=2)
