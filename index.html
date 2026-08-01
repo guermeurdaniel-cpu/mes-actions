@@ -97,11 +97,54 @@
   .multi-read .mr-row .mr-nm span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .alerte { background:#3a2410; border:1px solid #ff9f0a; color:#ffd479; border-radius:12px;
             padding:10px 12px; margin:0 0 12px; font-size:13px; line-height:1.45; }
+  /* --- Onglets --- */
+  .tabs { display:flex; gap:6px; background:#1c1c1e; border-radius:12px; padding:4px; margin:10px 0 4px; }
+  .tabs button { flex:1; background:none; border:none; color:#8e8e93; font-size:14px; font-weight:600;
+                 padding:8px 0; border-radius:9px; font-family:inherit; }
+  .tabs button.on { background:#2c2c2e; color:#fff; }
+  /* --- Formulaire de saisie --- */
+  .card { background:#1c1c1e; border-radius:14px; padding:14px; margin-top:10px; }
+  .card h2 { font-size:14px; font-weight:700; color:#e5e5ea; margin:0 0 4px; }
+  .card p.hint { font-size:12px; color:#8e8e93; line-height:1.5; margin:0 0 10px; }
+  .fld { margin-top:10px; }
+  .fld label { display:block; font-size:11px; color:#8e8e93; text-transform:uppercase;
+               letter-spacing:.5px; margin-bottom:4px; }
+  .fld input, .fld select, .fld textarea {
+      width:100%; background:#0c0c0e; color:#fff; border:1px solid #3a3a3c; border-radius:10px;
+      padding:11px 12px; font-size:16px; font-family:inherit; -webkit-appearance:none; }
+  .fld textarea { font-family:ui-monospace,Menlo,monospace; font-size:12px; line-height:1.5;
+                  min-height:210px; white-space:pre; overflow-x:auto; }
+  .btn { display:block; width:100%; border:none; border-radius:11px; padding:12px;
+         font-size:15px; font-weight:700; font-family:inherit; margin-top:10px; }
+  .btn.primary { background:#0a84ff; color:#fff; }
+  .btn.ghost { background:#2c2c2e; color:#0a84ff; }
+  .btn.danger { background:#2c2c2e; color:#ff453a; }
+  .btn:disabled { opacity:.4; }
+  .lnk { display:block; text-align:center; background:#2c2c2e; color:#0a84ff; border-radius:11px;
+         padding:12px; font-size:15px; font-weight:700; text-decoration:none; margin-top:10px; }
+  .att { background:#0c0c0e; border:1px solid #3a3a3c; border-radius:10px; padding:9px 11px;
+         margin-top:7px; display:flex; align-items:center; gap:10px; }
+  .att .txt { flex:1; min-width:0; font-family:ui-monospace,Menlo,monospace; font-size:12px;
+              color:#e5e5ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .att .del { background:none; border:none; color:#ff453a; font-size:18px; font-family:inherit; padding:0 4px; }
+  .segs { display:flex; gap:6px; background:#0c0c0e; border:1px solid #3a3a3c; border-radius:10px; padding:4px; }
+  .segs button { flex:1; background:none; border:none; color:#8e8e93; font-size:15px; font-weight:700;
+                 padding:9px 0; border-radius:8px; font-family:inherit; }
+  .segs button.on { background:#0a84ff; color:#fff; }
+  .vide { font-size:12px; color:#636366; margin-top:8px; }
+  .flash { font-size:12px; color:#30d158; margin-top:8px; min-height:16px; }
+  .flash.ko { color:#ff453a; }
 </style>
 </head>
 <body>
   <h1>Mes valeurs</h1>
 
+  <div class="tabs">
+    <button id="tabPortefeuille" class="on" onclick="showTab('portefeuille')">Portefeuille</button>
+    <button id="tabSaisie" onclick="showTab('saisie')">Saisie d un apport</button>
+  </div>
+
+  <div id="vuePortefeuille">
   <div id="alerteApports"></div>
 
   <div id="synth"></div>
@@ -122,6 +165,60 @@
   <button class="compare" onclick="openMultiChart()">Comparer les courbes (base 100)</button>
   <button class="refresh" onclick="loadAll()">Actualiser</button>
   <div id="maj" class="maj">Cotations : chargement...</div>
+  </div>
+
+  <div id="vueSaisie" style="display:none">
+    <div class="card">
+      <h2>Enregistrer un mouvement</h2>
+      <div class="fld">
+        <label for="fLigne">Support</label>
+        <select id="fLigne"></select>
+      </div>
+      <div class="fld">
+        <label>Sens</label>
+        <div class="segs">
+          <button id="fAchat" class="on" onclick="setSens(1)">Achat</button>
+          <button id="fVente" onclick="setSens(-1)">Vente</button>
+        </div>
+      </div>
+      <div class="fld">
+        <label for="fDate">Date</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="fld">
+        <label for="fQte">Quantite de parts</label>
+        <input type="text" id="fQte" inputmode="decimal" placeholder="ex. 22,0232">
+      </div>
+      <div class="fld">
+        <label for="fPrix">Prix d une part en euros</label>
+        <input type="text" id="fPrix" inputmode="decimal" placeholder="ex. 204,33">
+      </div>
+      <div id="fMontant" class="hint" style="margin:10px 0 0"></div>
+      <button class="btn primary" id="fBtnOk" onclick="enregistrerMouvement()">Enregistrer</button>
+      <div id="fFlash" class="flash"></div>
+      <div id="fSecours"></div>
+    </div>
+
+    <div class="card">
+      <h2>Derniers mouvements enregistres</h2>
+      <div id="fDerniers"></div>
+    </div>
+
+    <div class="card">
+      <h2>Jeton GitHub</h2>
+      <p class="hint">Jeton personnel a portee restreinte, stocke uniquement dans ce
+        navigateur. Il n est jamais ecrit dans le depot. Portee a donner :
+        depot mes-actions seul, autorisation Contents en lecture et ecriture.</p>
+      <div id="fJetonEtat" class="hint"></div>
+      <div class="fld">
+        <label for="fJeton">Coller le jeton</label>
+        <input type="password" id="fJeton" autocomplete="off" placeholder="github_pat_...">
+      </div>
+      <button class="btn ghost" onclick="enregistrerJeton()">Enregistrer le jeton</button>
+      <button class="btn danger" onclick="oublierJeton()">Oublier le jeton</button>
+      <div id="fFlash2" class="flash"></div>
+    </div>
+  </div>
 
   <!-- Modal plein ecran pour un graphique detaille -->
   <div id="chartModal" class="chart-modal">
@@ -166,6 +263,12 @@ const LIGNES = {
 let QUANTITES = {};   // rempli par chargerApports() : somme algebrique des quantites
 let PRU = {};         // rempli par chargerApports() : cout moyen pondere des achats
 let APPORTS = [];     // journal brut, une entree par ligne utile de apports.csv
+let CSV_BRUT = "";    // contenu texte de apports.csv tel qu il est dans le depot
+
+// Depot GitHub vise par l onglet de saisie (API Contents)
+const DEPOT      = "guermeurdaniel-cpu/mes-actions";
+const BRANCHE    = "main";
+const API_CONTENU= "https://api.github.com/repos/"+DEPOT+"/contents/apports.csv";
 
 const FONDS_EUROS       = 18135;   // Assurance vie - fonds euros : valeur actuelle (saisie a la main)
 const FONDS_EUROS_VERSE = 18135;   // Assurance vie - fonds euros : montant net verse (gain = valeur - verse)
@@ -242,17 +345,10 @@ function nombreFr(s){
   const v=parseFloat(s.replace(",","."));
   return isFinite(v)? v : null;
 }
-async function chargerApports(){
+// Analyse du texte du journal : remplit QUANTITES, PRU et APPORTS
+function parserApports(txt){
   QUANTITES={}; PRU={}; APPORTS=[];
   const inconnus=[], malformes=[];
-  let txt="";
-  try{
-    const r=await fetch("apports.csv?t="+Date.now(), {cache:"no-store"});
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    txt=await r.text();
-  }catch(e){
-    return {err:"apports.csv illisible ("+e.message+") : toutes les quantites sont a zero.", inconnus:inconnus, malformes:malformes};
-  }
   const achats={};   // cle -> {qte, cout} : achats seuls, pour le PRU
   txt.split(/\r?\n/).forEach(function(l, i){
     const brut=l.replace(/^\uFEFF/,"").trim();
@@ -273,7 +369,33 @@ async function chargerApports(){
   });
   for(const cle in achats){ if(achats[cle].qte>0) PRU[cle]=achats[cle].cout/achats[cle].qte; }
   APPORTS.sort(function(a,b){ return a.date<b.date? -1 : (a.date>b.date? 1 : 0); });
-  return {err:null, inconnus:inconnus, malformes:malformes};
+  return {inconnus:inconnus, malformes:malformes};
+}
+
+async function chargerApports(){
+  let txt="";
+  try{
+    const r=await fetch("apports.csv?t="+Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    txt=await r.text();
+  }catch(e){
+    if(PUBLICATION_ATTENDUE){ txt=PUBLICATION_ATTENDUE; }
+    else{
+      QUANTITES={}; PRU={}; APPORTS=[];
+      return {err:"apports.csv illisible ("+e.message+") : toutes les quantites sont a zero.", inconnus:[], malformes:[]};
+    }
+  }
+  // Un commit vient d etre fait : GitHub Pages peut encore servir l ancienne
+  // version pendant une minute. On garde la version commitee tant qu elle n est
+  // pas revenue du serveur, pour ne pas voir le mouvement disparaitre.
+  let attente=false;
+  if(PUBLICATION_ATTENDUE){
+    if(txt.replace(/\s+$/,"")===PUBLICATION_ATTENDUE.replace(/\s+$/,"")) PUBLICATION_ATTENDUE="";
+    else { txt=PUBLICATION_ATTENDUE; attente=true; }
+  }
+  CSV_BRUT=txt;
+  const r2=parserApports(txt);
+  return {err:null, inconnus:r2.inconnus, malformes:r2.malformes, attente:attente};
 }
 // Quantite reellement detenue sur une ligne a une date donnee : indispensable
 // pour que les courbes ne fassent pas apparaitre un apport recent comme une
@@ -302,6 +424,7 @@ function afficherAlerteApports(jrn){
   if(!box) return;
   const msgs=[];
   if(jrn.err) msgs.push(jrn.err);
+  if(jrn.attente) msgs.push("Mouvement commite, republication du site en cours : l affichage utilise deja la version a jour.");
   if(jrn.inconnus.length) msgs.push("Intitules absents de LIGNES, apports ignores : "+jrn.inconnus.join(", "));
   if(jrn.malformes.length) msgs.push("Lignes mal formees dans apports.csv (numeros) : "+jrn.malformes.join(", "));
   box.innerHTML = msgs.length? '<div class="alerte">'+msgs.join("<br>")+'</div>' : "";
@@ -517,11 +640,217 @@ function rowFund(f, series, dates, gmin, gmax){
     +'</div></div>'+spark;
 }
 
+// =======================================================
+//  ONGLET SAISIE : ecrit directement dans apports.csv via l API GitHub
+// =======================================================
+// La page lit le fichier, y ajoute la ligne du mouvement et le reecrit par un
+// commit (endpoint Contents de l API GitHub). Le jeton n est pas dans le code :
+// il est saisi une fois et garde dans le stockage local du navigateur.
+const CLE_JETON = "gh_token_mes_actions";
+let SENS = 1;                 // 1 = achat, -1 = vente
+let PUBLICATION_ATTENDUE = ""; // contenu commite pas encore servi par GitHub Pages
+
+function showTab(nom){
+  const p=(nom==="portefeuille");
+  document.getElementById("vuePortefeuille").style.display = p? "" : "none";
+  document.getElementById("vueSaisie").style.display       = p? "none" : "";
+  document.getElementById("tabPortefeuille").className = p? "on" : "";
+  document.getElementById("tabSaisie").className       = p? "" : "on";
+  if(!p) majSaisie();
+  window.scrollTo(0,0);
+}
+function flash(id, msg, ko){
+  const el=document.getElementById(id); if(!el) return;
+  el.className = ko? "flash ko" : "flash";
+  el.textContent = msg;
+  if(!ko) setTimeout(function(){ if(el.textContent===msg) el.textContent=""; }, 8000);
+}
+
+// --- Jeton ------------------------------------------------------------------
+function lireJeton(){ try{ return localStorage.getItem(CLE_JETON) || ""; }catch(e){ return ""; } }
+function enregistrerJeton(){
+  const v=document.getElementById("fJeton").value.trim();
+  if(!v) return flash("fFlash2","Colle le jeton avant d enregistrer.",true);
+  try{ localStorage.setItem(CLE_JETON, v); }catch(e){ return flash("fFlash2","Stockage local refuse.",true); }
+  document.getElementById("fJeton").value="";
+  majJetonEtat(); flash("fFlash2","Jeton enregistre.");
+}
+function oublierJeton(){
+  if(!confirm("Oublier le jeton ? Il faudra le recoller pour enregistrer un mouvement.")) return;
+  try{ localStorage.removeItem(CLE_JETON); }catch(e){}
+  majJetonEtat(); flash("fFlash2","Jeton efface.");
+}
+function majJetonEtat(){
+  const el=document.getElementById("fJetonEtat"); if(!el) return;
+  const j=lireJeton();
+  el.innerHTML = j? '<span style="color:#30d158">Jeton enregistre (termine par '+j.slice(-4)+').</span>'
+                  : '<span style="color:#ff9f0a">Aucun jeton : l enregistrement est impossible.</span>';
+}
+
+// --- Encodage base64 en UTF-8 (exige par l API Contents) ---------------------
+function b64encode(s){
+  const o=new TextEncoder().encode(s);
+  let bin=""; for(let i=0;i<o.length;i++) bin+=String.fromCharCode(o[i]);
+  return btoa(bin);
+}
+function b64decode(b){
+  const bin=atob(String(b).replace(/\s/g,""));
+  const o=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) o[i]=bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(o);
+}
+async function ghFetch(url, jeton, opts){
+  const o=opts||{};
+  o.headers=Object.assign({
+    "Authorization":"Bearer "+jeton,
+    "Accept":"application/vnd.github+json",
+    "X-GitHub-Api-Version":"2022-11-28"
+  }, o.headers||{});
+  o.cache="no-store";
+  const r=await fetch(url, o);
+  let j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok){
+    const m=(j&&j.message)? j.message : ("HTTP "+r.status);
+    throw new Error(r.status===401? "Jeton refuse ou expire."
+              : r.status===403? "Acces refuse : verifie la portee du jeton."
+              : r.status===404? "Fichier ou depot introuvable avec ce jeton."
+              : m);
+  }
+  return j;
+}
+
+// --- Formulaire -------------------------------------------------------------
+function setSens(s){
+  SENS=s;
+  document.getElementById("fAchat").className = (s===1)? "on":"";
+  document.getElementById("fVente").className = (s===-1)? "on":"";
+  majMontant();
+}
+function enveloppeDe(cle){
+  for(let i=0;i<ENVELOPPES.length;i++){ if(ENVELOPPES[i].keys.indexOf(cle)>=0) return ENVELOPPES[i].name; }
+  return "Autres";
+}
+function initSaisie(){
+  const sel=document.getElementById("fLigne");
+  if(sel && !sel.options.length){
+    const groupes={};
+    for(const nom in LIGNES){
+      const e=enveloppeDe(LIGNES[nom]);
+      (groupes[e]||(groupes[e]=[])).push(nom);
+    }
+    ["PEG","PEA","AV","Autres"].forEach(function(e){
+      if(!groupes[e]) return;
+      const g=document.createElement("optgroup");
+      g.label = (e==="AV")? "Assurance vie" : e;
+      groupes[e].forEach(function(nom){
+        const o=document.createElement("option"); o.value=nom; o.textContent=nom; g.appendChild(o);
+      });
+      sel.appendChild(g);
+    });
+  }
+  const d=document.getElementById("fDate");
+  if(d && !d.value){
+    const n=new Date();
+    d.value=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");
+  }
+  ["fQte","fPrix"].forEach(function(id){
+    const e=document.getElementById(id);
+    if(e && !e.dataset.lie){ e.addEventListener("input", majMontant); e.dataset.lie="1"; }
+  });
+  majJetonEtat(); majMontant();
+}
+// Rappel du montant : garde-fou contre une faute de frappe sur la quantite
+function majMontant(){
+  const box=document.getElementById("fMontant"); if(!box) return;
+  const q=nombreFr(document.getElementById("fQte").value);
+  const p=nombreFr(document.getElementById("fPrix").value);
+  box.textContent = (q!==null && p!==null)
+    ? (SENS===1? "Achat de ":"Vente de ")+eur(Math.abs(q)*p) : "";
+}
+function nombreCsv(v){
+  let s=String(v);
+  if(s.indexOf("e")>=0 || s.indexOf("E")>=0) s=v.toFixed(6);
+  return s;
+}
+function majSaisie(){
+  initSaisie();
+  const box=document.getElementById("fDerniers"); if(!box) return;
+  const n=APPORTS.length;
+  if(!n){ box.innerHTML='<div class="vide">Journal vide ou pas encore charge.</div>'; return; }
+  let h="";
+  APPORTS.slice(Math.max(0,n-6)).reverse().forEach(function(a){
+    const signe=a.qte<0? "Vente":"Achat";
+    const mnt=(a.prix!==null)? eur(Math.abs(a.qte)*a.prix) : "montant inconnu";
+    h+='<div class="att"><span class="txt">'+a.date+"  "+signe+"  "+a.nom+"  "+mnt+'</span></div>';
+  });
+  box.innerHTML=h;
+}
+
+// --- Le commit --------------------------------------------------------------
+async function enregistrerMouvement(){
+  const btn=document.getElementById("fBtnOk");
+  const jeton=lireJeton();
+  if(!jeton) return flash("fFlash","Enregistre d abord un jeton GitHub, plus bas.",true);
+  const nom=document.getElementById("fLigne").value;
+  const date=document.getElementById("fDate").value;
+  let q=nombreFr(document.getElementById("fQte").value);
+  const p=nombreFr(document.getElementById("fPrix").value);
+  if(!nom || !LIGNES[nom]) return flash("fFlash","Choisis un support.",true);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return flash("fFlash","Date incomplete.",true);
+  if(q===null || q===0) return flash("fFlash","Quantite absente ou nulle.",true);
+  if(p!==null && p<=0) return flash("fFlash","Le prix doit etre positif.",true);
+  q=Math.abs(q)*SENS;
+  const ligne=date+";"+nom+";"+nombreCsv(q)+";"+(p===null? "":nombreCsv(p));
+  const mnt=(p===null)? "" : "  "+eur(Math.abs(q)*p);
+  if(!confirm((SENS===1?"Achat":"Vente")+" de "+Math.abs(q)+" parts\n"+nom+mnt+"\nle "+date+"\n\nEnregistrer dans le depot ?")) return;
+
+  btn.disabled=true; flash("fFlash","Enregistrement en cours...");
+  try{
+    const url=API_CONTENU;
+    // 1) etat courant du fichier : on repart toujours du contenu reel du depot
+    const cur=await ghFetch(url+"?ref="+BRANCHE, jeton);
+    const ancien=b64decode(cur.content);
+    if(ancien.split(/\r?\n/).some(function(l){ return l.trim()===ligne; })){
+      btn.disabled=false;
+      return flash("fFlash","Ce mouvement est deja dans le journal.",true);
+    }
+    const nouveau=ancien.replace(/\s+$/,"")+"\n"+ligne+"\n";
+    // 2) commit
+    await ghFetch(url, jeton, {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        message:(SENS===1?"Apport ":"Vente ")+nom+" du "+date,
+        content:b64encode(nouveau),
+        sha:cur.sha,
+        branch:BRANCHE
+      })
+    });
+    // 3) prise en compte immediate, sans attendre la republication de Pages
+    CSV_BRUT=nouveau; PUBLICATION_ATTENDUE=nouveau;
+    parserApports(nouveau);
+    document.getElementById("fQte").value="";
+    document.getElementById("fPrix").value="";
+    document.getElementById("fSecours").innerHTML="";
+    majMontant(); majSaisie();
+    flash("fFlash","Mouvement enregistre. Le tableau de bord en tient compte tout de suite ; la republication du site prend une minute.");
+    loadAll();
+  }catch(e){
+    flash("fFlash","Echec : "+e.message,true);
+    // Filet : la ligne exacte reste affichee pour un report a la main
+    document.getElementById("fSecours").innerHTML=
+      '<p class="hint" style="margin-top:10px">Ligne a reporter a la main dans apports.csv si besoin :</p>'
+      +'<div class="att"><span class="txt">'+ligne.replace(/</g,"&lt;")+'</span></div>';
+  }
+  btn.disabled=false;
+}
+
 async function loadAll(){
   pegTotal=0; avUC=0; peaTotal=0; allCharts=[];
   // Journal des apports d abord : il fournit QUANTITES et PRU a tout le reste
   const jrn = await chargerApports();
   afficherAlerteApports(jrn);
+  if(document.getElementById("vueSaisie").style.display!=="none") majSaisie();
   document.getElementById("peg").innerHTML='<div class="row"><div class="sub">Chargement...</div></div>';
   document.getElementById("refs").innerHTML="";
   document.getElementById("av").innerHTML="";
@@ -997,6 +1326,7 @@ function drawFullChart(d){
   showAt(xOf(n-1)+cont.getBoundingClientRect().left);
 }
 
+initSaisie();
 loadAll();
 setInterval(loadAll, 60000);
 setInterval(renderMaj, 30000);   // rafraichit le "il y a X min" sans reinterroger Yahoo
