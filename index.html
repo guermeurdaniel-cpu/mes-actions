@@ -27,6 +27,7 @@
   .pr { font-size:16px; font-weight:700; color:#fff; }
   .up { color:#30d158; } .down { color:#ff453a; }
   .held { color:#0a84ff; font-weight:600; }
+  .pru { color:#8e8e93; }
   .err { font-size:11px; color:#ff453a; }
   .spark { width:88px; height:40px; display:block; }
   .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
@@ -408,6 +409,18 @@ function qteA(cle, date){
   });
   return q;
 }
+// Prix moyen d achat tel qu il etait a une date donnee : seuls les achats deja
+// realises a cette date comptent. Renvoie null tant qu il n y a aucun achat de
+// prix connu. C est ce qui permet de tracer un PRU qui evolue en marche d escalier
+// au fil des apports, et non une droite horizontale trompeuse.
+function pruA(cle, date){
+  let q=0, c=0;
+  APPORTS.forEach(function(a){
+    if(a.cle!==cle || a.prix===null || a.qte<=0) return;
+    if(!a.date || a.date<=date){ q+=a.qte; c+=a.qte*a.prix; }
+  });
+  return q>0? c/q : null;
+}
 // Capital investi a une date donnee = apports nets deja verses a cette date,
 // fonds euros compris. Sert a separer ce qui vient des versements de ce qui
 // vient de la performance.
@@ -500,11 +513,17 @@ function sparkline(values100, gmin, gmax, up){
   return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bl+'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+pts+'"/></svg>';
 }
 // Enregistre une serie (avec ses dates) et renvoie le sparkline emballe dans un wrapper cliquable
-function sparkClickable(label, dates, values, values100, gmin, gmax, up, unit){
+function sparkClickable(label, dates, values, values100, gmin, gmax, up, unit, cle){
   const svg=sparkline(values100, gmin, gmax, up);
   if(!dates || !values || values.length<2) return svg;
   const idx=allCharts.length;
-  allCharts.push({label:label, dates:dates, values:values, up:up, unit:unit||""});
+  // Serie du prix moyen d achat, alignee sur les memes dates que la courbe
+  let pru=null;
+  if(cle){
+    const s=dates.map(function(d){ return pruA(cle, d); });
+    if(s.some(function(v){ return v!=null; })) pru=s;
+  }
+  allCharts.push({label:label, dates:dates, values:values, up:up, unit:unit||"", pru:pru});
   return '<div class="spark-wrap" data-idx="'+idx+'" onclick="openFullChart('+idx+')">'+svg+'</div>';
 }
 function variation(values){ if(!values||values.length<2)return null; return (values[values.length-1]-values[0])/values[0]*100; }
@@ -614,6 +633,12 @@ async function fetchYahoo(symbol){
   throw lastErr || new Error("tous les proxies KO pour "+symbol);
 }
 
+// Prix moyen d achat d une ligne, formate pour l affichage. Chaine vide si inconnu.
+function pruTxt(k){
+  const v=PRU[k];
+  if(v==null) return "";
+  return '<span class="pru">PRU '+v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>';
+}
 function rowYahoo(it, gmin, gmax){
   const q=it.q;
   const dayPct=(q.prev?(q.price-q.prev)/q.prev*100:null);
@@ -621,9 +646,9 @@ function rowYahoo(it, gmin, gmax){
   const cost=lineCost(it.symbol);
   const pmvPct=(cost!=null && cost>0)? (h-cost)/cost*100 : variation(q.closes); // PMV depuis PRU, sinon repli marche
   const heldTxt=(qtyOf(it.symbol)>0)?'<span class="held">'+eur(h)+'</span>':"";
-  const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, q.cur||"");
+  const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, q.cur||"", it.symbol);
   return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
-    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
+    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pruTxt(it.symbol)+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
     +'</div></div>'+spark;
 }
 function rowFund(f, series, dates, gmin, gmax){
@@ -634,9 +659,9 @@ function rowFund(f, series, dates, gmin, gmax){
   const heldTxt=(qtyOf(f.isin)>0)?'<span class="held">'+eur(h)+'</span>':"";
   const val=f.value.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
   const oldTxt=(f.status==="ancien")?'<span style="color:#ff9f0a">ancien</span>':"";
-  const spark=sparkClickable(f.label, dates, series, toBase100(series), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, "");
+  const spark=sparkClickable(f.label, dates, series, toBase100(series), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, "", f.isin);
   return '<div class="info"><div class="nm">'+f.label+'</div><div class="sub">'
-    +'<span class="pr">'+val+'</span>'+oldTxt+pctSpan(lc?lc.pct:null,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
+    +'<span class="pr">'+val+'</span>'+pruTxt(f.isin)+oldTxt+pctSpan(lc?lc.pct:null,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
     +'</div></div>'+spark;
 }
 
@@ -772,6 +797,50 @@ function nombreCsv(v){
   if(s.indexOf("e")>=0 || s.indexOf("E")>=0) s=v.toFixed(6);
   return s;
 }
+
+// --- Insertion ordonnee dans apports.csv ------------------------------------
+// Le fichier est range par enveloppe, puis par support, puis par date. Une ligne
+// ajoutee betement a la fin casserait ce classement, donc on cherche sa place :
+//   1. juste apres les lignes du meme support, en respectant l ordre des dates
+//   2. sinon a la fin de la section de son enveloppe
+//   3. sinon a la fin du fichier
+// Les en-tetes de section sont les commentaires "# --- PEG ...", "# --- PEA ...",
+// "# --- Assurance vie ..." de apports.csv : ne pas les renommer.
+const ENTETES_SECTION = { "PEG":/^#\s*-+\s*PEG\b/i, "PEA":/^#\s*-+\s*PEA\b/i, "AV":/^#\s*-+\s*Assurance\b/i };
+function estEnteteSection(l){
+  for(const e in ENTETES_SECTION){ if(ENTETES_SECTION[e].test(l)) return true; }
+  return false;
+}
+function insererLigne(texte, ligne, nom, date, enveloppe){
+  const L=texte.replace(/\s+$/,"").split(/\r?\n/);
+  // 1) lignes deja presentes pour ce support
+  let apres=-1, avant=-1;
+  for(let i=0;i<L.length;i++){
+    const t=L[i].trim();
+    if(!t || t.charAt(0)==="#") continue;
+    const c=t.split(";");
+    if((c[1]||"").trim()!==nom) continue;
+    if(avant<0 && (c[0]||"").trim()>date) avant=i;   // 1re ligne posterieure
+    apres=i;                                          // derniere ligne du support
+  }
+  if(avant>=0){ L.splice(avant, 0, ligne); return L.join("\n")+"\n"; }
+  if(apres>=0){ L.splice(apres+1, 0, ligne); return L.join("\n")+"\n"; }
+  // 2) fin de la section de l enveloppe
+  const re=ENTETES_SECTION[enveloppe];
+  if(re){
+    let debut=-1;
+    for(let i=0;i<L.length;i++){ if(re.test(L[i].trim())){ debut=i; break; } }
+    if(debut>=0){
+      let fin=L.length;
+      for(let i=debut+1;i<L.length;i++){ if(estEnteteSection(L[i].trim())){ fin=i; break; } }
+      while(fin>debut+1 && !L[fin-1].trim()) fin--;   // ignorer les lignes vides de fin de section
+      L.splice(fin, 0, ligne);
+      return L.join("\n")+"\n";
+    }
+  }
+  // 3) filet : a la fin
+  return L.join("\n")+"\n"+ligne+"\n";
+}
 function majSaisie(){
   initSaisie();
   const box=document.getElementById("fDerniers"); if(!box) return;
@@ -814,7 +883,7 @@ async function enregistrerMouvement(){
       btn.disabled=false;
       return flash("fFlash","Ce mouvement est deja dans le journal.",true);
     }
-    const nouveau=ancien.replace(/\s+$/,"")+"\n"+ligne+"\n";
+    const nouveau=insererLigne(ancien, ligne, nom, date, enveloppeDe(LIGNES[nom]));
     // 2) commit
     await ghFetch(url, jeton, {
       method:"PUT",
@@ -1265,7 +1334,14 @@ function drawFullChart(d){
 
   const W=cont.clientWidth||window.innerWidth, H=cont.clientHeight||300;
   const padL=44, padR=10, padT=14, padB=26;
-  const vmin=Math.min.apply(null,values), vmax=Math.max.apply(null,values);
+  // La courbe du prix moyen d achat entre dans l echelle, sinon elle sortirait du cadre
+  const pruS=(d.pru && d.unit!=="%")? d.pru : null;
+  const pruDef=pruS? pruS.filter(function(v){ return v!=null; }) : [];
+  let vmin=Math.min.apply(null,values), vmax=Math.max.apply(null,values);
+  if(pruDef.length){
+    vmin=Math.min(vmin, Math.min.apply(null,pruDef));
+    vmax=Math.max(vmax, Math.max.apply(null,pruDef));
+  }
   const vpad=(vmax-vmin)*0.08 || vmax*0.02 || 1;
   const ymin=vmin-vpad, ymax=vmax+vpad;
   const xOf=function(i){ return padL+(n<=1?0:i*(W-padL-padR)/(n-1)); };
@@ -1293,10 +1369,31 @@ function drawFullChart(d){
     xAxisSvg+='<text x="'+x+'" y="'+(H-8)+'" font-size="11" fill="#8e8e93" text-anchor="middle">'+fmtDate(dates[i])+'</text>';
   }
 
+  // Prix moyen d achat : trait fin en marche d escalier, il ne bouge qu aux apports.
+  // Les dates anterieures au 1er achat connu ne sont pas tracees.
+  let pruSvg="";
+  if(pruDef.length){
+    let dpath="", ouvert=false, prev=null;
+    for(let i=0;i<n;i++){
+      const v=pruS[i];
+      if(v==null){ ouvert=false; prev=null; continue; }
+      const x=xOf(i).toFixed(1), y=yOf(v).toFixed(1);
+      if(!ouvert){ dpath+="M"+x+","+y; ouvert=true; }
+      else if(v!==prev){ dpath+=" L"+x+","+yOf(prev).toFixed(1)+" L"+x+","+y; }
+      else { dpath+=" L"+x+","+y; }
+      prev=v;
+    }
+    const dernier=pruDef[pruDef.length-1];
+    pruSvg='<path d="'+dpath+'" fill="none" stroke="#ffd479" stroke-width="1" opacity="0.85"/>'
+      +'<text x="'+(W-padR)+'" y="'+(yOf(dernier)-4).toFixed(1)+'" font-size="10" fill="#ffd479" text-anchor="end">PRU '
+      +dernier.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+'</text>';
+  }
+
   const svgHtml=
     '<svg id="fullChartSvg" width="'+W+'" height="'+H+'" style="display:block;touch-action:none">'
     +gridSvg
     +'<path d="'+areaPts+'" fill="'+color+'" opacity="0.12" stroke="none"/>'
+    +pruSvg
     +'<polyline fill="none" stroke="'+color+'" stroke-width="2.5" points="'+pts+'"/>'
     +xAxisSvg
     +'<g id="crosshair" style="display:none">'
@@ -1318,8 +1415,14 @@ function drawFullChart(d){
     document.getElementById("chDot").setAttribute("cx",cx); document.getElementById("chDot").setAttribute("cy",cy);
     const v=values[i];
     const valTxt=(d.unit==="%")? v.toFixed(2) : (d.unit==="EUR"||d.unit==="")? v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4}) : v.toFixed(4);
+    const pv=pruS? pruS[i] : null;
+    const pruLu=(pv!=null)
+      ? '<div class="d" style="color:#ffd479">PRU a cette date : '
+        +pv.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})
+        +'  ('+(v>=pv?"+":"")+((v/pv-1)*100).toFixed(2)+'%)</div>'
+      : "";
     document.getElementById("chartReadout").innerHTML=
-      '<div class="v">'+valTxt+(d.unit?" "+d.unit:"")+'</div><div class="d">'+dates[i]+'</div>';
+      '<div class="v">'+valTxt+(d.unit?" "+d.unit:"")+'</div><div class="d">'+dates[i]+'</div>'+pruLu;
   }
   activeShowAt=showAt; bindChartPointer();
   // valeur initiale = dernier point
