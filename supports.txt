@@ -1,0 +1,155 @@
+# =============================================================================
+#  CATALOGUE DES SUPPORTS
+# =============================================================================
+#
+#  Ce fichier decrit CE QUI EXISTE dans le portefeuille : pour chaque valeur, son
+#  identifiant, son enveloppe, l endroit ou aller chercher son cours, et la facon
+#  de la classer dans la synthese.
+#
+#  Il ne dit rien de ce que tu possedes : les quantites et les prix d achat sont
+#  dans apports.csv, qui est un journal date. Deux fichiers, deux roles :
+#      supports.txt  ->  la fiche d identite des valeurs      (change rarement)
+#      apports.csv   ->  l historique de tes mouvements       (change souvent)
+#
+#  Ce fichier est lu par le tableau de bord (index.html), par le recuperateur de
+#  valeurs liquidatives (scraper.py) et par l historisation du patrimoine
+#  (patrimoine.py). Ajouter une valeur au portefeuille se fait donc ICI, et
+#  nulle part ailleurs.
+#
+# -----------------------------------------------------------------------------
+#  COMMENT C EST ECRIT
+# -----------------------------------------------------------------------------
+#
+#  Un support = un bloc. Le titre entre crochets est l intitule, c est lui qu il
+#  faut recopier dans apports.csv et c est lui qui s affiche a l ecran.
+#  Ensuite une ligne par renseignement, sous la forme  nom = valeur.
+#  Les lignes vides et les lignes commencant par # sont ignorees.
+#
+#      cle           Identifiant technique.
+#                    Valeur cotee   -> symbole Yahoo Finance (ex. AIR.PA, ASML.AS)
+#                    Fonds non cote -> code ISIN             (ex. QS0009080175)
+#
+#      enveloppe     PEG, PEA ou AV. Determine la section d affichage et le
+#                    regroupement des plus-values.
+#
+#      source        Ou trouver la valeur du jour :
+#                      yahoo       cotation en direct (actions et ETF)
+#                      amundi-ee   API Amundi epargne salariale, pour les ISIN QS...
+#                      amundi-fr   API Amundi grand public, pour les ISIN FR...
+#                      abcbourse   page produit abcbourse.com, url obligatoire
+#                      boursier    page produit boursier.com, url obligatoire
+#
+#      url           Adresse de la page produit. Uniquement pour abcbourse
+#                    et boursier ; inutile pour les autres sources.
+#
+#      actions       Part de la valeur qui est investie en actions, entre 0 et 1.
+#                    1 pour une action ou un ETF actions, 0 pour un monetaire ou
+#                    un obligataire, une fraction pour un fonds mixte.
+#
+#      geo           Repartition de la POCHE ACTIONS par mandat d indice.
+#                    Trois destinations possibles : monde, euro, emergents.
+#                    Une seule    ->  geo = monde
+#                    Un melange   ->  geo = monde 0.50 + euro 0.50
+#                    Inutile de la renseigner si actions = 0.
+#
+# -----------------------------------------------------------------------------
+#  L ORDRE DES BLOCS EST L ORDRE D AFFICHAGE a l interieur de chaque enveloppe.
+#  Deplacer un bloc reorganise le tableau de bord, sans rien casser.
+# -----------------------------------------------------------------------------
+
+
+# =============================== PEG / PER ===================================
+
+[Actions Internationales ESR]
+cle       = QS0009080175
+enveloppe = PEG
+source    = amundi-ee
+actions   = 1.00
+geo       = monde
+# Fonds Amundi actions monde, benchmark MSCI World. Contient la tranche PEG et
+# la tranche PER, qui partagent la meme valeur liquidative.
+
+[Label Equilibre ESR]
+cle       = QS0009080746
+enveloppe = PEG
+source    = amundi-ee
+actions   = 0.50
+geo       = monde 0.50 + euro 0.50
+# Fonds mixte, bande de gestion 35-65% d actions ; on retient 50% en moyenne.
+# Sa poche actions est pour moitie mondiale, pour moitie zone euro.
+
+[Label Monetaire ESR]
+cle       = QS0009080720
+enveloppe = PEG
+source    = amundi-ee
+actions   = 0.00
+# Monetaire : 100% defensif, aucune poche actions a repartir.
+
+[Airbus]
+cle       = AIR.PA
+enveloppe = PEG
+source    = yahoo
+actions   = 1.00
+geo       = euro
+# Actionnariat salarie. Action du CAC 40, donc classee zone euro.
+
+
+# ==================================== PEA ====================================
+
+[ETF MSCI World]
+cle       = WPEA.PA
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = monde
+# Coeur du PEA.
+
+[ETF Asie Emergente]
+cle       = PAASI.PA
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = emergents
+# ETF Amundi PEA Asie Emergente (FR0013412012), replication synthetique.
+
+[ASML]
+cle       = ASML.AS
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = monde
+# ASML Holding (NL0010273215), Euronext Amsterdam. Classee monde developpe.
+
+
+# ============================== ASSURANCE VIE ================================
+
+[Amundi Euro Liquidity]
+cle       = FR0011408798
+enveloppe = AV
+source    = amundi-fr
+actions   = 0.00
+# Support de liquidite, utilise pour les arbitrages.
+
+[Carmignac Securite]
+cle       = FR0010149120
+enveloppe = AV
+source    = abcbourse
+url       = https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120
+actions   = 0.00
+# Obligataire court terme.
+
+[ODDO Global Target 2029]
+cle       = FR001400HHQ5
+enveloppe = AV
+source    = boursier
+url       = https://www.boursier.com/opcvm/cours/oddo-bhf-global-target-ig-2029-cr-eur-FR001400HHQ5,FR.html
+actions   = 0.00
+# Obligataire date, echeance 2029.
+
+[ETF Euro Corporate SRI]
+cle       = CC4.PA
+enveloppe = AV
+source    = yahoo
+actions   = 0.00
+# ETF obligataire d entreprises zone euro (LU1681039647). Cote, donc source yahoo,
+# bien qu il soit loge en assurance vie.
