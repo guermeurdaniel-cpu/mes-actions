@@ -4,7 +4,8 @@ patrimoine.py — Enregistre chaque jour la valeur REELLE du patrimoine global
 dans patrimoine.json (liste de {date, valeur}).
 
 Sources :
-  - index.html : QUANTITES + FONDS_EUROS (source de verite unique, editee a la main)
+  - apports.csv : journal des apports (source de verite des quantites, editee a la main)
+  - index.html  : table LIGNES (intitule -> ISIN/ticker) + FONDS_EUROS
   - nav.json   : dernieres VL des fonds (Amundi, Carmignac, ODDO)
   - Yahoo Finance (cote serveur, pas de CORS) : WPEA.PA, PAASI.PA, ASML.AS, CC4.PA
 
@@ -18,33 +19,71 @@ import datetime
 
 from curl_cffi import requests as creq
 
-YAHOO_SYMBOLS = ["WPEA.PA", "PAASI.PA", "ASML.AS", "CC4.PA"]
+YAHOO_SYMBOLS = ["WPEA.PA", "PAASI.PA", "ASML.AS", "CC4.PA", "AIR.PA"]
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
 
 
-def lire_quantites_et_fonds_euros(chemin="index.html"):
-    """Extrait QUANTITES (dict) et FONDS_EUROS (float) depuis index.html."""
+def lire_lignes(chemin="index.html"):
+    """Extrait la table LIGNES (intitule lisible -> ISIN ou ticker) depuis index.html."""
     with open(chemin, "r", encoding="utf-8") as f:
         html = f.read()
 
-    m = re.search(r"const\s+QUANTITES\s*=\s*\{(.*?)\};", html, re.S)
+    m = re.search(r"const\s+LIGNES\s*=\s*\{(.*?)\};", html, re.S)
     if not m:
-        raise RuntimeError("Bloc QUANTITES introuvable dans index.html")
-    bloc = m.group(1)
+        raise RuntimeError("Bloc LIGNES introuvable dans index.html")
+    lignes = dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', m.group(1)))
+    if not lignes:
+        raise RuntimeError("Bloc LIGNES vide")
+    return lignes
 
+
+def nombre_fr(txt):
+    """Convertit '39,07' ou '39.07' en float. Chaine vide -> None."""
+    t = (txt or "").strip().replace("\u00a0", "").replace(" ", "").replace("EUR", "").replace("€", "")
+    if not t:
+        return None
+    return float(t.replace(",", "."))
+
+
+def lire_apports(lignes, chemin="apports.csv"):
+    """Somme les quantites du journal des apports, par ISIN / ticker.
+
+    Format : date ; intitule ; quantite ; prix   (# = commentaire)
+    Quantite negative = vente : elle diminue simplement la quantite detenue.
+    """
     quantites = {}
-    for cle, expr in re.findall(r'"([^"]+)"\s*:\s*([^,\n]+)', bloc):
-        expr = expr.split("//")[0].strip().rstrip(",")
-        if not re.fullmatch(r"[\d.\s+\-*/()]+", expr):
-            raise RuntimeError("Expression non numerique pour %s : %s" % (cle, expr))
-        quantites[cle] = float(eval(expr, {"__builtins__": {}}, {}))
+    with open(chemin, "r", encoding="utf-8-sig") as f:
+        for num, brut in enumerate(f, start=1):
+            ligne = brut.strip()
+            if not ligne or ligne.startswith("#"):
+                continue
+            champs = ligne.split(";")
+            if len(champs) < 3:
+                raise RuntimeError("apports.csv ligne %d : moins de 3 champs" % num)
+            nom = champs[1].strip()
+            qte = nombre_fr(champs[2])
+            if nom not in lignes:
+                raise RuntimeError("apports.csv ligne %d : intitule inconnu '%s'" % (num, nom))
+            if qte is None:
+                raise RuntimeError("apports.csv ligne %d : quantite absente" % num)
+            cle = lignes[nom]
+            quantites[cle] = quantites.get(cle, 0.0) + qte
+    return quantites
 
-    m2 = re.search(r"const\s+FONDS_EUROS\s*=\s*([\d.]+)", html)
-    if not m2:
+
+def lire_fonds_euros(chemin="index.html"):
+    with open(chemin, "r", encoding="utf-8") as f:
+        html = f.read()
+    m = re.search(r"const\s+FONDS_EUROS\s*=\s*([\d.]+)", html)
+    if not m:
         raise RuntimeError("FONDS_EUROS introuvable dans index.html")
-    fonds_euros = float(m2.group(1))
+    return float(m.group(1))
 
-    return quantites, fonds_euros
+
+def lire_quantites_et_fonds_euros(chemin="index.html"):
+    """Quantites detenues (depuis apports.csv) et fonds euros (depuis index.html)."""
+    lignes = lire_lignes(chemin)
+    return lire_apports(lignes), lire_fonds_euros(chemin)
 
 
 def prix_yahoo(sym):
