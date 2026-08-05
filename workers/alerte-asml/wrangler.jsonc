@@ -1,0 +1,41 @@
+{
+  // Configuration du Worker "alerte-asml".
+  //
+  // Ce fichier decrit tout ce qui a ete saisi a la main dans le tableau de bord
+  // Cloudflare. Il n'est pas obligatoire pour faire tourner le Worker : tant que
+  // le deploiement se fait par copier-coller dans l'editeur web, il sert de
+  // documentation. Il devient executable le jour ou un deploiement par Wrangler
+  // est mis en place.
+  //
+  // Les SECRETS ne figurent jamais ici : voir README.md.
+
+  "name": "alerte-asml",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-05",
+
+  // Identifiant du compte Cloudflare (visible dans le tableau de bord,
+  // ce n'est pas un secret : sans jeton API il ne donne acces a rien).
+  "account_id": "7f43b9275a95d56b2c26a0f3f483b009",
+
+  // Journalisation des executions, consultable dans l'onglet Observability.
+  "observability": {
+    "enabled": true
+  },
+
+  // Declencheur automatique : toutes les 5 minutes, de 8h a 18h UTC,
+  // du lundi au vendredi. Meme creneau que l'ancien workflow GitHub Actions.
+  "triggers": {
+    "crons": ["*/5 8-18 * * 1-5"]
+  },
+
+  // Stockage de l'etat de l'alerte (remplace alerte_asml_state.json).
+  // Le nom de variable ETAT est celui utilise dans src/index.js : il ne doit
+  // pas changer. L'identifiant est celui du namespace "alerte-etat", a relever
+  // dans Storage & Databases > KV.
+  "kv_namespaces": [
+    {
+      "binding": "ETAT",
+      "id": "A_COMPLETER_id_du_namespace_alerte-etat"
+    }
+  ]
+}
