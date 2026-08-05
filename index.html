@@ -648,15 +648,13 @@ const YH_BASES = [
 ];
 function yhProxies(){ return MON_PROXY ? [{u:MON_PROXY,enc:true}, ...YH_PROXIES] : YH_PROXIES.slice(); }
 
-// Cache : "SYMB|2026-08-04" -> {v:valeur ou null, t:horodatage}
-// Les succes sont gardes definitivement, les echecs 10 minutes seulement,
-// pour que la page se repare toute seule si Yahoo comble le trou.
-const CLOTURES_RATTRAPEES = {};
+// Cache par symbole : {t:horodatage, m:{ "2026-08-04": cloture, ... }}
+// Garde 10 minutes, pour que la page se repare seule si Yahoo comble ses trous.
+const CLOTURES_HORAIRES = {};
 
-async function fetchClotureIntraday(symbol, jour){
-  const cle = symbol+"|"+jour;
-  const c = CLOTURES_RATTRAPEES[cle];
-  if(c && (c.v!=null || (Date.now()-c.t) < 600000)) return c.v;
+async function fetchCloturesIntraday(symbol){
+  const c = CLOTURES_HORAIRES[symbol];
+  if(c && (Date.now()-c.t) < 600000) return c.m;
   for(const base of YH_BASES){
     const yurl = base + symbol + "?range=1mo&interval=60m";
     for(const p of yhProxies()){
@@ -673,18 +671,19 @@ async function fetchClotureIntraday(symbol, jour){
         const m2 = res.meta, ts2 = res.timestamp||[];
         const q2 = (res.indicators && res.indicators.quote && res.indicators.quote[0].close) || [];
         const off2 = (m2.gmtoffset||0)*1000;
-        let val = null;
+        const par = {};
         for(let i=0;i<q2.length;i++){
-          if(q2[i]!=null && new Date(ts2[i]*1000+off2).toISOString().slice(0,10) === jour) val = q2[i];
+          // La derniere bougie non nulle de la journee l emporte : c est la cloture.
+          if(q2[i]!=null) par[new Date(ts2[i]*1000+off2).toISOString().slice(0,10)] = q2[i];
         }
-        if(val!=null){ CLOTURES_RATTRAPEES[cle] = {v:val, t:Date.now()}; return val; }
+        if(Object.keys(par).length){ CLOTURES_HORAIRES[symbol] = {t:Date.now(), m:par}; return par; }
       }catch(e){
         clearTimeout(timer);
       }
     }
   }
-  CLOTURES_RATTRAPEES[cle] = {v:null, t:Date.now()};
-  return null;
+  CLOTURES_HORAIRES[symbol] = {t:Date.now(), m:{}};
+  return {};
 }
 
 async function fetchYahoo(symbol){
@@ -713,22 +712,37 @@ async function fetchYahoo(symbol){
         // on les ramene a la date locale de la bourse pour dater correctement les seances.
         const off = (m.gmtoffset||0)*1000;
         const dayOf = function(sec){ return new Date(sec*1000+off).toISOString().slice(0,10); };
-        const closes=[], dates=[];
-        for(let i=0;i<rawCloses.length;i++){
-          if(rawCloses[i]!=null){
-            closes.push(rawCloses[i]);
-            dates.push(dayOf(ts[i]));
+        const jours = ts.map(dayOf);
+
+        // Trous de la serie journaliere : Yahoo renvoie la ligne de la seance mais
+        // avec close = null. On les reconstitue a partir des bougies horaires du
+        // mois, en une seule requete supplementaire pour tout le symbole, et
+        // seulement s il y a au moins un trou. La courbe et la variation du jour
+        // reposent ainsi sur le meme calendrier boursier complet.
+        const valeurs = rawCloses.slice();
+        let rattrapees = 0, manquantes = 0;
+        if(valeurs.some(function(v){ return v==null; })){
+          const parJour = await fetchCloturesIntraday(symbol);
+          for(let i=0;i<valeurs.length;i++){
+            if(valeurs[i]==null){
+              const v = parJour[jours[i]];
+              if(v!=null){ valeurs[i] = v; rattrapees++; } else manquantes++;
+            }
           }
+        }
+
+        // Serie affichee : les seances non reconstituables restent exclues du trace.
+        const closes=[], dates=[];
+        for(let i=0;i<valeurs.length;i++){
+          if(valeurs[i]!=null){ closes.push(valeurs[i]); dates.push(jours[i]); }
         }
         if(!closes.length){ lastErr = new Error("0 cloture ("+p.u+")"); continue; }
         const price = (m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
 
         // --- Cloture de la seance precedente --------------------------------
-        // On raisonne sur les tableaux BRUTS, avant filtrage des nulls : Yahoo
-        // renvoie la ligne de chaque seance meme quand la cloture manque, donc
-        // le calendrier boursier reel est connu. La veille est la ligne d avant
-        // celle de la seance en cours, que sa valeur soit renseignee ou non.
-        const jours  = ts.map(dayOf);
+        // On raisonne sur les tableaux BRUTS, avant exclusion des trous restants :
+        // le calendrier boursier reel est celui de Yahoo, la veille est la ligne
+        // d avant celle de la seance en cours, reconstituee ou non.
         const refDay = dayOf(m.regularMarketTime!=null ? m.regularMarketTime : Math.floor(Date.now()/1000));
         let idxCourant = -1;
         for(let i=jours.length-1;i>=0;i--){ if(jours[i]===refDay){ idxCourant=i; break; } }
@@ -738,22 +752,17 @@ async function fetchYahoo(symbol){
                         : (idxCourant < 0 ? jours.length-1 : -1);
 
         let prev = null, prevDate = null, prevSrc = "";
-        if(idxVeille >= 0){
+        if(idxVeille >= 0 && valeurs[idxVeille] != null){
+          prev     = valeurs[idxVeille];
           prevDate = jours[idxVeille];
-          if(rawCloses[idxVeille] != null){
-            prev    = rawCloses[idxVeille];
-            prevSrc = "serie journaliere";
-          }else{
-            prev    = await fetchClotureIntraday(symbol, prevDate);
-            prevSrc = (prev != null) ? "rattrapage horaire" : "indisponible";
-          }
+          prevSrc  = (rawCloses[idxVeille] != null) ? "serie journaliere" : "rattrapage horaire";
         }
         // Dernier recours : la derniere cloture connue avant la seance en cours.
         // La variation affichee porte alors sur plusieurs seances et le dit.
         if(prev == null){
           for(let i=(idxVeille>=0 ? idxVeille : jours.length-1); i>=0; i--){
-            if(rawCloses[i]!=null && jours[i]!==refDay){
-              prev = rawCloses[i]; prevDate = jours[i]; prevSrc = "repli"; break;
+            if(valeurs[i]!=null && jours[i]!==refDay){
+              prev = valeurs[i]; prevDate = jours[i]; prevSrc = "repli"; break;
             }
           }
         }
@@ -767,6 +776,7 @@ async function fetchYahoo(symbol){
           marketTime: (m.regularMarketTime!=null) ? new Date(m.regularMarketTime*1000).toISOString() : "ABSENT",
           refDay    : refDay,
           sourceVeille : prevSrc,
+          trous     : rattrapees+" reconstituees, "+manquantes+" perdues",
           derniereBougie : dates[dates.length-1]+" = "+closes[closes.length-1],
           reference : prevDate+" = "+prev,
           cours     : price,
@@ -814,6 +824,7 @@ function rowYahoo(it, gmin, gmax){
       +'  |  refDay '+d.refDay+' (veille : '+d.sourceVeille+')'
       +'<br>proxy '+d.via+' '+d.base+'  |  gmtoffset '+d.gmtoffset
       +'  |  cotation de '+d.marketTime+' (il y a '+d.ageSecondes+' s)'
+      +'  |  trous : '+d.trous
       +'<br>meta previousClose '+d.previousClose+'  |  chartPreviousClose '+d.chartPrevClose
       +'<br>brutes (nulls compris) : '+d.brutes
       +'<br>fin de serie : '+d.finSerie+'</div>') : "";
