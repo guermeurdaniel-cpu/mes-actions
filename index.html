@@ -635,6 +635,58 @@ const YH_PROXIES = [
   {u:"https://api.allorigins.win/raw?url=",      enc:true}
 ];
 
+// --- Rattrapage d une cloture manquante -------------------------------------
+// La serie journaliere Yahoo comporte parfois des seances a close = null
+// (constate les 31/07 et 04/08/2026 sur ASML.AS). La ligne existe, seule la
+// valeur manque. On va alors chercher la cloture reelle dans les bougies
+// horaires de la meme journee : la derniere bougie non nulle du jour.
+// Approximation assumee : elle peut manquer le fixing de cloture d Amsterdam,
+// l ecart reste de l ordre du dixieme de pourcent.
+const YH_BASES = [
+  "https://query1.finance.yahoo.com/v8/finance/chart/",
+  "https://query2.finance.yahoo.com/v8/finance/chart/"
+];
+function yhProxies(){ return MON_PROXY ? [{u:MON_PROXY,enc:true}, ...YH_PROXIES] : YH_PROXIES.slice(); }
+
+// Cache : "SYMB|2026-08-04" -> {v:valeur ou null, t:horodatage}
+// Les succes sont gardes definitivement, les echecs 10 minutes seulement,
+// pour que la page se repare toute seule si Yahoo comble le trou.
+const CLOTURES_RATTRAPEES = {};
+
+async function fetchClotureIntraday(symbol, jour){
+  const cle = symbol+"|"+jour;
+  const c = CLOTURES_RATTRAPEES[cle];
+  if(c && (c.v!=null || (Date.now()-c.t) < 600000)) return c.v;
+  for(const base of YH_BASES){
+    const yurl = base + symbol + "?range=1mo&interval=60m";
+    for(const p of yhProxies()){
+      const target = p.u + (p.enc ? encodeURIComponent(yurl) : yurl);
+      const ctl = new AbortController();
+      const timer = setTimeout(function(){ ctl.abort(); }, 4000);
+      try{
+        const r = await fetch(target, {signal:ctl.signal, cache:"no-store"});
+        clearTimeout(timer);
+        if(!r.ok) continue;
+        const d = await r.json();
+        const res = d && d.chart && d.chart.result && d.chart.result[0];
+        if(!res) continue;
+        const m2 = res.meta, ts2 = res.timestamp||[];
+        const q2 = (res.indicators && res.indicators.quote && res.indicators.quote[0].close) || [];
+        const off2 = (m2.gmtoffset||0)*1000;
+        let val = null;
+        for(let i=0;i<q2.length;i++){
+          if(q2[i]!=null && new Date(ts2[i]*1000+off2).toISOString().slice(0,10) === jour) val = q2[i];
+        }
+        if(val!=null){ CLOTURES_RATTRAPEES[cle] = {v:val, t:Date.now()}; return val; }
+      }catch(e){
+        clearTimeout(timer);
+      }
+    }
+  }
+  CLOTURES_RATTRAPEES[cle] = {v:null, t:Date.now()};
+  return null;
+}
+
 async function fetchYahoo(symbol){
   const bases = [
     "https://query1.finance.yahoo.com/v8/finance/chart/",
@@ -671,20 +723,40 @@ async function fetchYahoo(symbol){
         if(!closes.length){ lastErr = new Error("0 cloture ("+p.u+")"); continue; }
         const price = (m.regularMarketPrice!=null)?m.regularMarketPrice:closes[closes.length-1];
 
-        // Cloture de la veille deduite des bougies, pas de meta.previousClose :
-        // sur interval=1d ce champ ne designe pas toujours la seance precedente.
+        // --- Cloture de la seance precedente --------------------------------
+        // On raisonne sur les tableaux BRUTS, avant filtrage des nulls : Yahoo
+        // renvoie la ligne de chaque seance meme quand la cloture manque, donc
+        // le calendrier boursier reel est connu. La veille est la ligne d avant
+        // celle de la seance en cours, que sa valeur soit renseignee ou non.
+        const jours  = ts.map(dayOf);
         const refDay = dayOf(m.regularMarketTime!=null ? m.regularMarketTime : Math.floor(Date.now()/1000));
-        let prev = null, prevDate = null, branche = "";
-        if(dates[dates.length-1] === refDay){
-          prev     = (closes.length>=2) ? closes[closes.length-2] : null;
-          prevDate = (dates.length>=2)  ? dates[dates.length-2]   : null;
-          branche  = "bougie du jour presente";
-        }else{
-          prev     = closes[closes.length-1];
-          prevDate = dates[dates.length-1];
-          branche  = "bougie du jour absente";
+        let idxCourant = -1;
+        for(let i=jours.length-1;i>=0;i--){ if(jours[i]===refDay){ idxCourant=i; break; } }
+        // Bougie du jour presente -> la veille est juste avant.
+        // Bougie du jour absente  -> la veille est la derniere ligne.
+        const idxVeille = (idxCourant > 0) ? idxCourant-1
+                        : (idxCourant < 0 ? jours.length-1 : -1);
+
+        let prev = null, prevDate = null, prevSrc = "";
+        if(idxVeille >= 0){
+          prevDate = jours[idxVeille];
+          if(rawCloses[idxVeille] != null){
+            prev    = rawCloses[idxVeille];
+            prevSrc = "serie journaliere";
+          }else{
+            prev    = await fetchClotureIntraday(symbol, prevDate);
+            prevSrc = (prev != null) ? "rattrapage horaire" : "indisponible";
+          }
         }
-        if(prev==null && m.chartPreviousClose!=null){ prev = m.chartPreviousClose; prevDate = "chartPreviousClose"; }
+        // Dernier recours : la derniere cloture connue avant la seance en cours.
+        // La variation affichee porte alors sur plusieurs seances et le dit.
+        if(prev == null){
+          for(let i=(idxVeille>=0 ? idxVeille : jours.length-1); i>=0; i--){
+            if(rawCloses[i]!=null && jours[i]!==refDay){
+              prev = rawCloses[i]; prevDate = jours[i]; prevSrc = "repli"; break;
+            }
+          }
+        }
 
         // --- INSTRUMENTATION (a retirer une fois le diagnostic fait) ---
         const diag = {
@@ -694,7 +766,7 @@ async function fetchYahoo(symbol){
           gmtoffset : (m.gmtoffset==null ? "ABSENT" : m.gmtoffset),
           marketTime: (m.regularMarketTime!=null) ? new Date(m.regularMarketTime*1000).toISOString() : "ABSENT",
           refDay    : refDay,
-          branche   : branche,
+          sourceVeille : prevSrc,
           derniereBougie : dates[dates.length-1]+" = "+closes[closes.length-1],
           reference : prevDate+" = "+prev,
           cours     : price,
@@ -710,7 +782,7 @@ async function fetchYahoo(symbol){
         window.DIAG[symbol] = diag;
         // --- FIN INSTRUMENTATION ---
 
-        return {price:price, prev:prev, cur:m.currency, closes:closes, dates:dates, diag:diag};
+        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency, closes:closes, dates:dates, diag:diag};
       }catch(e){
         clearTimeout(timer);
         lastErr = e;   // proxy mort / timeout / CORS -> proxy suivant
@@ -729,6 +801,9 @@ function pruTxt(k){
 function rowYahoo(it, gmin, gmax){
   const q=it.q;
   const dayPct=(q.prev?(q.price-q.prev)/q.prev*100:null);
+  // Si la cloture de la veille n a pas pu etre retrouvee, la variation porte sur
+  // plusieurs seances : on l ecrit au lieu de la faire passer pour un "j".
+  const dayLbl=(q.prevSrc==="repli") ? ("depuis "+q.prevDate+" ") : "j ";
   const h=qtyOf(it.symbol)*q.price;
   const cost=lineCost(it.symbol);
   const pmvPct=(cost!=null && cost>0)? (h-cost)/cost*100 : variation(q.closes); // PMV depuis PRU, sinon repli marche
@@ -736,14 +811,14 @@ function rowYahoo(it, gmin, gmax){
   const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, q.cur||"", it.symbol);
   const d=q.diag;
   const diagTxt = d ? ('<div class="diag">ref '+d.reference+'  |  derniere bougie '+d.derniereBougie
-      +'  |  refDay '+d.refDay+' ('+d.branche+')'
+      +'  |  refDay '+d.refDay+' (veille : '+d.sourceVeille+')'
       +'<br>proxy '+d.via+' '+d.base+'  |  gmtoffset '+d.gmtoffset
       +'  |  cotation de '+d.marketTime+' (il y a '+d.ageSecondes+' s)'
       +'<br>meta previousClose '+d.previousClose+'  |  chartPreviousClose '+d.chartPrevClose
       +'<br>brutes (nulls compris) : '+d.brutes
       +'<br>fin de serie : '+d.finSerie+'</div>') : "";
   return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
-    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pruTxt(it.symbol)+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
+    +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pruTxt(it.symbol)+pctSpan(dayPct,dayLbl)+pctSpan(pmvPct,"PMV ")+heldTxt
     +'</div>'+diagTxt+'</div>'+spark;
 }
 function rowFund(f, series, dates, gmin, gmax){
