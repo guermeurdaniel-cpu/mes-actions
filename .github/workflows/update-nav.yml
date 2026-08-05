@@ -2,7 +2,12 @@ name: Mise a jour VL Amundi
 
 on:
   schedule:
-    - cron: "*/60 8-18 * * 1-5"
+    # 3 passages par jour ouvre, en UTC :
+    #  6h  -> VL Amundi publiee la veille au soir
+    # 12h  -> filet de securite si le passage du matin a echoue
+    # 17h  -> apres la cloture d'Euronext (17h35 Paris = 15h35 UTC l'ete,
+    #         16h35 UTC l'hiver), pour figer le patrimoine du jour
+    - cron: "0 6,12,17 * * 1-5"
   workflow_dispatch:
 
 permissions:
