@@ -28,6 +28,8 @@
   .up { color:#30d158; } .down { color:#ff453a; }
   .held { color:#0a84ff; font-weight:600; }
   .pru { color:#8e8e93; }
+  .diag { color:#5ac8fa; font-size:10px; line-height:1.35; margin-top:3px;
+          font-family:ui-monospace,Menlo,Consolas,monospace; word-break:break-all; }
   .err { font-size:11px; color:#ff453a; }
   .spark { width:88px; height:40px; display:block; }
   .scale-note { font-size:10px; color:#636366; margin:8px 4px 0; }
@@ -671,20 +673,41 @@ async function fetchYahoo(symbol){
 
         // Cloture de la veille deduite des bougies, pas de meta.previousClose :
         // sur interval=1d ce champ ne designe pas toujours la seance precedente.
-        // Date de la derniere cotation connue (jour de bourse en cours, ou derniere seance
-        // si le marche est ferme), puis comparaison avec la date de la derniere bougie.
         const refDay = dayOf(m.regularMarketTime!=null ? m.regularMarketTime : Math.floor(Date.now()/1000));
-        let prev = null;
+        let prev = null, prevDate = null, branche = "";
         if(dates[dates.length-1] === refDay){
-          // La derniere bougie est celle de la seance en cours -> la veille est juste avant.
-          prev = (closes.length>=2) ? closes[closes.length-2] : null;
+          prev     = (closes.length>=2) ? closes[closes.length-2] : null;
+          prevDate = (dates.length>=2)  ? dates[dates.length-2]   : null;
+          branche  = "bougie du jour presente";
         }else{
-          // Pas encore de bougie pour la seance en cours -> la veille est la derniere bougie.
-          prev = closes[closes.length-1];
+          prev     = closes[closes.length-1];
+          prevDate = dates[dates.length-1];
+          branche  = "bougie du jour absente";
         }
-        if(prev==null && m.chartPreviousClose!=null) prev = m.chartPreviousClose;
+        if(prev==null && m.chartPreviousClose!=null){ prev = m.chartPreviousClose; prevDate = "chartPreviousClose"; }
 
-        return {price:price, prev:prev, cur:m.currency, closes:closes, dates:dates};
+        // --- INSTRUMENTATION (a retirer une fois le diagnostic fait) ---
+        const diag = {
+          symbole   : symbol,
+          via       : p.u,
+          base      : base.indexOf("query2")>=0 ? "query2" : "query1",
+          gmtoffset : (m.gmtoffset==null ? "ABSENT" : m.gmtoffset),
+          marketTime: (m.regularMarketTime!=null) ? new Date(m.regularMarketTime*1000).toISOString() : "ABSENT",
+          refDay    : refDay,
+          branche   : branche,
+          derniereBougie : dates[dates.length-1]+" = "+closes[closes.length-1],
+          reference : prevDate+" = "+prev,
+          cours     : price,
+          ageSecondes : (m.regularMarketTime!=null) ? Math.round(Date.now()/1000 - m.regularMarketTime) : null,
+          nbBougies : closes.length,
+          finSerie  : dates.slice(-4).map(function(d,i){ return d+":"+closes[closes.length-4+i]; }).join("  ")
+        };
+        console.log("[DIAG]", diag);
+        if(!window.DIAG) window.DIAG = {};
+        window.DIAG[symbol] = diag;
+        // --- FIN INSTRUMENTATION ---
+
+        return {price:price, prev:prev, cur:m.currency, closes:closes, dates:dates, diag:diag};
       }catch(e){
         clearTimeout(timer);
         lastErr = e;   // proxy mort / timeout / CORS -> proxy suivant
@@ -708,9 +731,15 @@ function rowYahoo(it, gmin, gmax){
   const pmvPct=(cost!=null && cost>0)? (h-cost)/cost*100 : variation(q.closes); // PMV depuis PRU, sinon repli marche
   const heldTxt=(qtyOf(it.symbol)>0)?'<span class="held">'+eur(h)+'</span>':"";
   const spark=sparkClickable(it.label, q.dates, q.closes, toBase100(q.closes), gmin, gmax, (pmvPct==null?0:pmvPct)>=0, q.cur||"", it.symbol);
+  const d=q.diag;
+  const diagTxt = d ? ('<div class="diag">ref '+d.reference+'  |  derniere bougie '+d.derniereBougie
+      +'  |  refDay '+d.refDay+' ('+d.branche+')'
+      +'<br>proxy '+d.via+' '+d.base+'  |  gmtoffset '+d.gmtoffset
+      +'  |  cotation de '+d.marketTime+' (il y a '+d.ageSecondes+' s)'
+      +'<br>fin de serie : '+d.finSerie+'</div>') : "";
   return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
     +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pruTxt(it.symbol)+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
-    +'</div></div>'+spark;
+    +'</div>'+diagTxt+'</div>'+spark;
 }
 function rowFund(f, series, dates, gmin, gmax){
   const lc=lastChange(series);
