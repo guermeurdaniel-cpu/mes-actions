@@ -700,6 +700,9 @@ async function fetchYahoo(symbol){
           cours     : price,
           ageSecondes : (m.regularMarketTime!=null) ? Math.round(Date.now()/1000 - m.regularMarketTime) : null,
           nbBougies : closes.length,
+          previousClose  : (m.previousClose!=null)      ? m.previousClose      : "ABSENT",
+          chartPrevClose : (m.chartPreviousClose!=null) ? m.chartPreviousClose : "ABSENT",
+          brutes    : ts.slice(-7).map(function(t,i){ const k=ts.length-7+i; return dayOf(t)+":"+(rawCloses[k]==null?"NULL":rawCloses[k]); }).join("  "),
           finSerie  : dates.slice(-4).map(function(d,i){ return d+":"+closes[closes.length-4+i]; }).join("  ")
         };
         console.log("[DIAG]", diag);
@@ -736,6 +739,8 @@ function rowYahoo(it, gmin, gmax){
       +'  |  refDay '+d.refDay+' ('+d.branche+')'
       +'<br>proxy '+d.via+' '+d.base+'  |  gmtoffset '+d.gmtoffset
       +'  |  cotation de '+d.marketTime+' (il y a '+d.ageSecondes+' s)'
+      +'<br>meta previousClose '+d.previousClose+'  |  chartPreviousClose '+d.chartPrevClose
+      +'<br>brutes (nulls compris) : '+d.brutes
       +'<br>fin de serie : '+d.finSerie+'</div>') : "";
   return '<div class="info"><div class="nm">'+it.label+'</div><div class="sub">'
     +'<span class="pr">'+q.price.toFixed(2)+'</span>'+pruTxt(it.symbol)+pctSpan(dayPct,"j ")+pctSpan(pmvPct,"PMV ")+heldTxt
