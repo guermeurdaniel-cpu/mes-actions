@@ -120,6 +120,15 @@ actions   = 1.00
 geo       = monde
 # ASML Holding (NL0010273215), Euronext Amsterdam. Classee monde developpe.
 
+[Air Liquide]
+cle       = AI.PA
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = euro
+# Air Liquide (FR0000120073), Euronext Paris. Action du CAC 40, donc classee
+# zone euro, comme Airbus.
+
 
 # ============================== ASSURANCE VIE ================================
 
