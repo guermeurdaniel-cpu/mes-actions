@@ -6,7 +6,7 @@
     "value": 40.42,
     "currency": "EUR",
     "date": "2026-08-07",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
@@ -15,7 +15,7 @@
     "value": 331.7,
     "currency": "EUR",
     "date": "2026-08-07",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
@@ -24,31 +24,31 @@
     "value": 1312.9476,
     "currency": "EUR",
     "date": "2026-08-10",
-    "status": "ok"
+    "status": "ancien"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10942.2002,
+    "value": 10940.19,
     "currency": "EUR",
-    "date": "2026-08-10",
+    "date": "2026-08-07",
     "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1931.92,
+    "value": 1933.13,
     "currency": "EUR",
-    "date": "2026-08-06",
+    "date": "2026-08-07",
     "status": "ok"
   },
   "FR001400HHQ5": {
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 110.85,
+    "value": 110.9,
     "currency": "EUR",
     "date": "2026-07-07",
     "status": "ok"
