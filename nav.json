@@ -39,16 +39,16 @@
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1932.59,
+    "value": 1931.92,
     "currency": "EUR",
-    "date": "2026-08-05",
+    "date": "2026-08-06",
     "status": "ok"
   },
   "FR001400HHQ5": {
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 110.89,
+    "value": 110.85,
     "currency": "EUR",
     "date": "2026-07-07",
     "status": "ok"
