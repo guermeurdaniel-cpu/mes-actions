@@ -1,0 +1,3 @@
+Fichier d'essai — test du connecteur MCP GitHub via Cloudflare Worker.
+Créé le 12 août 2026. À supprimer une fois la vérification faite.
+Accents de contrôle : éàüçÉÈ œ € — vérifier qu'ils s'affichent correctement sur GitHub.
