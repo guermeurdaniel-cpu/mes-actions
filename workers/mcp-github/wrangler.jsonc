@@ -1,0 +1,22 @@
+{
+  // Configuration du Worker "mcp-github".
+  //
+  // Serveur MCP qui donne a Claude la lecture et l'ecriture sur les depots
+  // GitHub de Daniel. Contrairement au Worker alerte-asml, il n'a ni cron ni
+  // stockage KV : il ne fait que repondre a des requetes.
+  //
+  // Les SECRETS ne figurent jamais ici : voir README.md.
+
+  "name": "mcp-github",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-05",
+
+  // Identifiant du compte Cloudflare (visible dans le tableau de bord,
+  // ce n'est pas un secret : sans jeton API il ne donne acces a rien).
+  "account_id": "7f43b9275a95d56b2c26a0f3f483b009",
+
+  // Journalisation des requetes, consultable dans l'onglet Observability.
+  "observability": {
+    "enabled": true
+  }
+}
