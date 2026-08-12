@@ -13,7 +13,10 @@
  *   TELEGRAM_CHAT_ID  secret
  *   CLE_ACCES         secret        - segment d'URL pour les appels manuels
  *
- * Declencheur Cron :  */5 8-18 * * 1-5   (heures UTC, declare dans wrangler.jsonc)
+ * Declencheur Cron : toutes les 5 minutes, de 8h a 18h UTC, du lundi au
+ * vendredi. L'expression exacte est declaree dans wrangler.jsonc (ne pas
+ * l'ecrire ici : une etoile suivie d'une barre oblique fermerait ce
+ * commentaire et casserait le fichier).
  */
 
 const SYMBOLE    = "ASML.AS";
