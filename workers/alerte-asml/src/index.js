@@ -2,13 +2,18 @@
  * Alerte ASML - Cloudflare Worker
  * Remplace le workflow GitHub Actions .github/workflows/alerte-asml.yml
  *
+ * Deploiement : automatique via Workers Builds, depuis ce depot.
+ * Le fichier wrangler.jsonc fait foi pour le cron et la liaison KV : une
+ * modification faite dans le tableau de bord Cloudflare sera ecrasee au
+ * deploiement suivant.
+ *
  * Liaisons attendues (onglet Settings du Worker) :
  *   ETAT              KV namespace  - remplace alerte_asml_state.json
  *   TELEGRAM_TOKEN    secret
  *   TELEGRAM_CHAT_ID  secret
  *   CLE_ACCES         secret        - segment d'URL pour les appels manuels
  *
- * Declencheur Cron :  0/5 8-18 * * 1-5   (heures UTC)
+ * Declencheur Cron :  */5 8-18 * * 1-5   (heures UTC, declare dans wrangler.jsonc)
  */
 
 const SYMBOLE    = "ASML.AS";
