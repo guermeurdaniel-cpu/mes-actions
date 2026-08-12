@@ -1,6 +1,15 @@
 /**
- * Alerte ASML - Cloudflare Worker
+ * Alertes de bande - Cloudflare Worker
  * Remplace le workflow GitHub Actions .github/workflows/alerte-asml.yml
+ *
+ * Surveille TOUTES les valeurs cotees declarees dans supports.txt, a la racine
+ * du depot mes-actions, et envoie un message Telegram quand la variation par
+ * rapport a la cloture de la seance precedente franchit la bande.
+ *
+ * La liste n'est PAS figee dans ce fichier : elle est relue a chaque passage.
+ * Ajouter, retirer ou renommer un support dans supports.txt suffit, sans
+ * redeploiement. Une valeur retiree cesse d'etre surveillee et son etat est
+ * oublie au passage suivant.
  *
  * Deploiement : automatique via Workers Builds, depuis ce depot.
  * Le fichier wrangler.jsonc fait foi pour le cron et la liaison KV : une
@@ -12,6 +21,7 @@
  *   TELEGRAM_TOKEN    secret
  *   TELEGRAM_CHAT_ID  secret
  *   CLE_ACCES         secret        - segment d'URL pour les appels manuels
+ *   GITHUB_TOKEN      secret        - FACULTATIF, voir chargerSupports()
  *
  * Declencheur Cron : toutes les 5 minutes, de 8h a 18h UTC, du lundi au
  * vendredi. L'expression exacte est declaree dans wrangler.jsonc (ne pas
@@ -19,11 +29,73 @@
  * commentaire et casserait le fichier).
  */
 
-const SYMBOLE    = "ASML.AS";
+const PROPRIETAIRE = "guermeurdaniel-cpu";
+const DEPOT        = "mes-actions";
+const BRANCHE      = "main";
+const FICHIER      = "supports.txt";
+
 const BORNE_BAS  = -3.0;   // % sous la cloture de la seance precedente
 const BORNE_HAUT =  3.0;   // % au-dessus
-const CLE_ETAT   = "asml";
+const MAX_SYMBOLES = 20;   // garde-fou : plafond de sous-requetes par passage
+const CLE_ETAT   = "etat"; // une seule cle KV, un objet indexe par symbole
 const CHART      = "https://query1.finance.yahoo.com/v8/finance/chart/";
+
+/* ---------- catalogue des supports ---------- */
+
+/**
+ * Decoupe supports.txt en blocs [Intitule] suivis de lignes "nom = valeur",
+ * et ne garde que les supports dont la source est yahoo : les fonds non cotes
+ * n'ont pas de cours en direct, donc pas de variation du jour.
+ */
+function analyserSupports(texte){
+  const supports = [];
+  let courant = null;
+  for(const brute of texte.split("\n")){
+    const ligne = brute.trim();
+    if(!ligne || ligne.charAt(0) === "#") continue;
+    if(ligne.charAt(0) === "[" && ligne.indexOf("]") > 0){
+      if(courant) supports.push(courant);
+      courant = { titre: ligne.slice(1, ligne.indexOf("]")).trim() };
+      continue;
+    }
+    const eq = ligne.indexOf("=");
+    if(courant && eq > 0){
+      courant[ligne.slice(0, eq).trim().toLowerCase()] = ligne.slice(eq + 1).trim();
+    }
+  }
+  if(courant) supports.push(courant);
+  return supports.filter(function(s){
+    return s.cle && (s.source || "").toLowerCase() === "yahoo";
+  });
+}
+
+/**
+ * Lit supports.txt dans le depot.
+ * Avec GITHUB_TOKEN : par l'API Contents, ce qui continuera de fonctionner si
+ * le depot passe en prive. Sans jeton : par l'URL brute, qui exige un depot
+ * public. Les deux voies sont equivalentes tant que le depot est public.
+ */
+async function chargerSupports(env){
+  if(env.GITHUB_TOKEN){
+    const r = await fetch("https://api.github.com/repos/" + PROPRIETAIRE + "/" + DEPOT
+      + "/contents/" + FICHIER + "?ref=" + BRANCHE, {
+      headers: {
+        "Authorization": "Bearer " + env.GITHUB_TOKEN,
+        "Accept": "application/vnd.github.raw",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "worker-alertes"
+      }
+    });
+    if(!r.ok) throw new Error("GitHub HTTP " + r.status + " sur " + FICHIER);
+    return analyserSupports(await r.text());
+  }
+  const r = await fetch("https://raw.githubusercontent.com/" + PROPRIETAIRE + "/" + DEPOT
+    + "/" + BRANCHE + "/" + FICHIER, { cf: { cacheTtl: 0 } });
+  if(!r.ok) throw new Error("raw.githubusercontent HTTP " + r.status + " sur " + FICHIER);
+  return analyserSupports(await r.text());
+}
+
+/* ---------- cotations ---------- */
 
 function jourDe(sec, off){
   // Horodatages Yahoo en UTC : on ajoute le decalage de la place avant de dater.
@@ -73,8 +145,8 @@ async function clotureIntraday(symbole, jour){
  * meta.chartPreviousClose n'est PAS utilise : ce champ designe la seance
  * precedant la fenetre demandee, pas la veille.
  */
-async function evaluer(){
-  const res = await chartJson(SYMBOLE, "?range=1mo&interval=1d");
+async function evaluer(symbole){
+  const res = await chartJson(symbole, "?range=1mo&interval=1d");
   const e = extraire(res);
   const cours = e.meta.regularMarketPrice;
   const jours = e.ts.map(function(t){ return jourDe(t, e.off); });
@@ -96,20 +168,23 @@ async function evaluer(){
       veille = e.closes[idxVeille];
       source = "serie journaliere";
     }else{
-      veille = await clotureIntraday(SYMBOLE, jourVeille);
+      veille = await clotureIntraday(symbole, jourVeille);
       source = (veille != null) ? "rattrapage horaire" : "introuvable";
     }
   }
 
   if(cours == null || !veille){
-    return { ok:false, refJour:refJour, jourVeille:jourVeille, source:source };
+    return { symbole:symbole, ok:false, refJour:refJour, jourVeille:jourVeille, source:source };
   }
   return {
-    ok: true, cours: cours, veille: veille, jourVeille: jourVeille,
-    source: source, refJour: refJour,
+    symbole: symbole, ok: true, cours: cours, veille: veille,
+    jourVeille: jourVeille, source: source, refJour: refJour,
+    devise: e.meta.currency || "",
     variation: (cours - veille) / veille * 100
   };
 }
+
+/* ---------- alerte ---------- */
 
 async function envoyerTelegram(env, texte){
   if(!env.TELEGRAM_TOKEN || !env.TELEGRAM_CHAT_ID) return "secrets Telegram absents";
@@ -127,52 +202,82 @@ async function envoyerTelegram(env, texte){
 }
 
 async function verifier(env){
-  let r;
+  let supports;
   try{
-    r = await evaluer();
+    supports = await chargerSupports(env);
   }catch(err){
-    return "Yahoo injoignable : " + err.message;
+    // Sans catalogue, on ne sait pas quoi surveiller : on ne touche a rien.
+    return "Catalogue illisible : " + err.message + " - aucune alerte";
   }
-
-  if(!r.ok){
-    // Sans reference fiable, une bande a +/-3% ne veut rien dire :
-    // on n'alerte pas et on laisse l'etat inchange.
-    return "Reference de veille indisponible (seance " + r.jourVeille + ") - aucune alerte";
+  if(!supports.length) return "Aucun support cote dans " + FICHIER + " - aucune alerte";
+  if(supports.length > MAX_SYMBOLES){
+    supports = supports.slice(0, MAX_SYMBOLES);
   }
-
-  const dansBande = (r.variation >= BORNE_BAS && r.variation <= BORNE_HAUT);
 
   const stocke = await env.ETAT.get(CLE_ETAT);
-  let etat = null;
-  if(stocke){ try{ etat = JSON.parse(stocke); }catch(err){ etat = null; } }
-  // Nouveau jour de bourse -> on repart de "dans la bande".
-  const etaitDansBande = (etat && etat.date === r.refJour) ? etat.dansBande : true;
-  const franchissement = etaitDansBande && !dansBande;
+  let ancien = {};
+  if(stocke){ try{ ancien = JSON.parse(stocke) || {}; }catch(err){ ancien = {}; } }
 
-  const nouveau = JSON.stringify({ date: r.refJour, dansBande: dansBande });
-  if(nouveau !== stocke) await env.ETAT.put(CLE_ETAT, nouveau);
+  const nouveau = {};          // reconstruit a partir des seuls supports courants
+  const lignes = [];           // journal
+  const franchissements = [];  // a signaler
 
-  const entete = SYMBOLE + "  cours=" + r.cours.toFixed(2)
-    + "  veille=" + r.veille.toFixed(2) + " (" + r.jourVeille + ", " + r.source + ")"
-    + "  variation=" + (r.variation>=0?"+":"") + r.variation.toFixed(2) + "%";
+  for(const s of supports){
+    let r;
+    try{
+      r = await evaluer(s.cle);
+    }catch(err){
+      lignes.push(s.cle + " : Yahoo injoignable (" + err.message + ")");
+      if(ancien[s.cle]) nouveau[s.cle] = ancien[s.cle];  // etat conserve tel quel
+      continue;
+    }
+    if(!r.ok){
+      lignes.push(s.cle + " : reference de veille indisponible (seance " + r.jourVeille + ")");
+      if(ancien[s.cle]) nouveau[s.cle] = ancien[s.cle];
+      continue;
+    }
 
-  if(!franchissement){
-    return entete + "  -> " + (dansBande ? "dans la bande" : "hors bande, deja signale");
+    const dansBande = (r.variation >= BORNE_BAS && r.variation <= BORNE_HAUT);
+    const av = ancien[s.cle];
+    // Nouveau jour de bourse, ou support jamais vu -> on repart de "dans la bande".
+    const etaitDansBande = (av && av.date === r.refJour) ? av.dansBande : true;
+    nouveau[s.cle] = { date: r.refJour, dansBande: dansBande };
+
+    lignes.push(s.cle + " " + r.cours.toFixed(2)
+      + "  veille " + r.veille.toFixed(2) + " (" + r.jourVeille + ", " + r.source + ")"
+      + "  " + (r.variation>=0?"+":"") + r.variation.toFixed(2) + "%"
+      + "  -> " + (dansBande ? "dans la bande"
+                             : (etaitDansBande ? "FRANCHISSEMENT" : "hors bande, deja signale")));
+
+    if(etaitDansBande && !dansBande) franchissements.push({ support: s, r: r });
   }
 
-  const sens  = (r.variation < BORNE_BAS) ? "BASSE" : "HAUTE";
-  const rond  = (r.variation < 0) ? "\u{1F534}" : "\u{1F7E2}";
-  const heure = new Date().toISOString().slice(11,16) + " UTC";
-  const msg =
-    rond + " ALERTE ASML - Franchissement borne " + sens + "\n" +
-    "Cours : " + r.cours.toFixed(2) + " EUR\n" +
-    "Variation : " + (r.variation>=0?"+":"") + r.variation.toFixed(2) +
-      "% (veille " + r.jourVeille + " : " + r.veille.toFixed(2) + " EUR)\n" +
-    "Bande : [" + BORNE_BAS + "%, " + BORNE_HAUT + "%]\n" +
-    "Heure : " + heure;
+  const texteEtat = JSON.stringify(nouveau);
+  if(texteEtat !== stocke) await env.ETAT.put(CLE_ETAT, texteEtat);
 
-  const envoi = await envoyerTelegram(env, msg);
-  return entete + "  -> FRANCHISSEMENT " + sens + " (" + envoi + ")";
+  let envoi = "";
+  if(franchissements.length){
+    const heure = new Date().toISOString().slice(11,16) + " UTC";
+    const corps = franchissements.map(function(f){
+      const sens = (f.r.variation < BORNE_BAS) ? "borne BASSE" : "borne HAUTE";
+      const rond = (f.r.variation < 0) ? "\u{1F534}" : "\u{1F7E2}";
+      return rond + " " + f.support.titre + " (" + f.r.symbole + ") - " + sens + "\n"
+        + "Cours : " + f.r.cours.toFixed(2) + " " + f.r.devise + "\n"
+        + "Variation : " + (f.r.variation>=0?"+":"") + f.r.variation.toFixed(2)
+        + "% (veille " + f.r.jourVeille + " : " + f.r.veille.toFixed(2) + ")";
+    }).join("\n\n");
+    const entete = (franchissements.length === 1)
+      ? "ALERTE - Franchissement de bande\n\n"
+      : "ALERTE - " + franchissements.length + " franchissements de bande\n\n";
+    envoi = await envoyerTelegram(env,
+      entete + corps + "\n\nBande : [" + BORNE_BAS + "%, " + BORNE_HAUT + "%]\nHeure : " + heure);
+  }
+
+  const oublies = Object.keys(ancien).filter(function(k){ return !(k in nouveau); });
+  return supports.length + " support(s) surveille(s)"
+    + (oublies.length ? "  |  retires du catalogue : " + oublies.join(", ") : "")
+    + (franchissements.length ? "  |  " + franchissements.length + " franchissement(s) (" + envoi + ")" : "")
+    + "\n" + lignes.join("\n");
 }
 
 export default {
@@ -190,9 +295,22 @@ export default {
       return new Response("Not found", { status: 404 });
     }
     if(chemin[1] === "etat"){
-      const r = await evaluer().catch(function(e){ return { erreur: e.message }; });
-      const stocke = await env.ETAT.get(CLE_ETAT);
-      return Response.json({ evaluation: r, etatStocke: stocke });
+      let supports = [], erreur = null;
+      try{ supports = await chargerSupports(env); }catch(e){ erreur = e.message; }
+      const evaluations = [];
+      for(const s of supports){
+        const r = await evaluer(s.cle).catch(function(e){
+          return { symbole: s.cle, erreur: e.message };
+        });
+        r.titre = s.titre;
+        evaluations.push(r);
+      }
+      return Response.json({
+        catalogue: erreur ? ("ERREUR : " + erreur) : (supports.length + " support(s) cote(s)"),
+        bande: [BORNE_BAS, BORNE_HAUT],
+        evaluations: evaluations,
+        etatStocke: await env.ETAT.get(CLE_ETAT)
+      });
     }
     if(chemin[1] === "test"){
       return new Response(await verifier(env), { headers:{ "Content-Type":"text/plain; charset=utf-8" } });
