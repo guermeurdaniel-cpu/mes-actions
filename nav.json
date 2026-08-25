@@ -12,9 +12,9 @@
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 328.06,
+    "value": 327.57,
     "currency": "EUR",
-    "date": "2026-08-21",
+    "date": "2026-08-24",
     "status": "ok"
   },
   "QS0009080720": {
@@ -30,9 +30,9 @@
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10951.854,
+    "value": 10952.6145,
     "currency": "EUR",
-    "date": "2026-08-24",
+    "date": "2026-08-25",
     "status": "ok"
   },
   "FR0010149120": {
