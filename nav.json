@@ -3,9 +3,9 @@
     "isin": "QS0009080175",
     "label": "Actions Internationales ESR",
     "category": "PEG",
-    "value": 40.05,
+    "value": 39.94,
     "currency": "EUR",
-    "date": "2026-08-28",
+    "date": "2026-08-31",
     "status": "ok"
   },
   "QS0009080746": {
@@ -50,7 +50,7 @@
     "category": "AV",
     "value": 110.56,
     "currency": "EUR",
-    "date": "2026-08-25",
+    "date": "2026-09-01",
     "status": "ok"
   }
 }
