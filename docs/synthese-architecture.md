@@ -1,6 +1,6 @@
 # Synthese d'architecture — mes-actions
 
-Mis a jour le 13 aout 2026.
+Mis a jour le 4 septembre 2026.
 
 Ce document sert de point de reprise : il doit suffire, seul, pour reprendre le
 travail dans une nouvelle conversation sans rien reexpliquer. Il decrit ce qui
@@ -86,7 +86,8 @@ Surveille **toutes** les valeurs cotees de `supports.txt` — celles dont
 de plus ou moins 3 %. La liste est relue a chaque passage : ajouter, retirer ou
 renommer un support suffit, sans redeploiement.
 
-- Cron : toutes les 5 min, 8h-18h UTC, du lundi au vendredi
+- Cron : toutes les 5 min, **7h-16h UTC**, du lundi au vendredi, jours **nommes**
+  (`MON-FRI`, jamais `1-5` — voir section 8)
 - KV `ETAT`, namespace `alerte-etat`, **une seule cle** `etat` contenant un objet
   indexe par symbole, reconstruit a chaque passage (une valeur retiree est donc
   oubliee d'elle-meme)
@@ -97,9 +98,32 @@ renommer un support suffit, sans redeploiement.
 - Diagnostic : `/<CLE_ACCES>/etat` (lecture seule) et `/<CLE_ACCES>/test`
   (execution complete)
 
+**Pourquoi 7-16 UTC** (elargi le 04/09/2026, auparavant 8-18). Euronext ouvre a
+9h et ferme a 17h30, heure de Paris. En ete (UTC+2) la fenetre couvre
+9h00-18h55 ; en hiver (UTC+1), 8h00-17h55. Une seule expression convient donc
+toute l'annee. L'ancienne fenetre 8-18 commencait a 10h heure de Paris en ete :
+la premiere heure de bourse, celle des ecarts d'ouverture, n'etait pas
+surveillee, et un franchissement matinal n'etait signale qu'a 10h.
+
+`CLE_ACCES` est un secret Cloudflare : il ne se relit pas. S'il est perdu, le
+remplacer par une nouvelle valeur **strictement alphanumerique** sous le meme
+nom ; cela ne casse rien d'autre, le cron et Telegram ne l'utilisent pas.
+
 `GITHUB_TOKEN` est inutile tant que le depot est public : le catalogue est lu par
 l'URL brute. Le jour du passage en prive, poser ce secret suffit, le code bascule
 seul sur l'API GitHub.
+
+**Marche a suivre en cas de silence de l'alerte** (eprouvee le 04/09/2026) :
+
+1. appeler `/etat` et lire le champ `etatStocke` — la date qu'il porte est celle
+   du dernier passage reussi du cron. Une date de la veille prouve qu'aucune
+   execution n'a eu lieu depuis
+2. onglet **Cron events** : il liste les executions de la semaine avec leur
+   statut. La derniere ligne date la panne a la minute pres
+3. dans Settings, saisir l'expression et **lire les prochains declenchements
+   annonces** : c'est le seul arbitre fiable de son interpretation
+4. `/test` en dernier : il execute tout et envoie l'alerte, mais reecrit l'etat
+   en KV et efface donc la trace du point 1
 
 ### 3.3 `mcp-github` — connecteur MCP
 
@@ -174,8 +198,11 @@ Les secrets, eux, ne sont jamais touches.
 **Limite genante, confirmee le 13/08/2026 :** Workers Builds ne respecte pas le
 marqueur `[skip ci]` (supporte par Cloudflare Pages seulement) et n'a pas de
 champ « Build watch paths ». **Tout** commit reconstruit, y compris les ecritures
-de donnees faites par les workflows. C'est cosmetique — quelques constructions
-inutiles par jour — mais ca encombre l'historique des versions.
+de donnees faites par les workflows. Mesure le 04/09/2026 : une dizaine de
+deploiements en quatre jours, tous par Wrangler, aucun lie a une modification de
+code. C'est cosmetique tant que rien ne casse, mais ca noie l'historique des
+versions et complique tout diagnostic — c'est la premiere piste que l'on suit a
+tort quand une panne survient.
 
 Deux remedes possibles, aucun mis en oeuvre :
 - separer le code des Workers dans un depot distinct (le plus propre, et compatible
@@ -198,6 +225,11 @@ Point en suspens : wrangler avertit que les Preview URLs sont activees par defau
   unique `etat`
 - Figer la version de wrangler dans un `package.json` (actuellement 4.122.0
   telechargee a la volee a chaque construction)
+- **Surveiller le temps processeur du Worker d'alerte** : environ 6 ms par
+  passage pour 6 valeurs, alors que le plafond du plan gratuit est de l'ordre de
+  10 ms. Ajouter des valeurs cotees au catalogue rapproche du plafond, et un
+  depassement se traduirait par des executions en echec, donc par un nouveau
+  silence
 
 Mesure faite le 05/08/2026 sur les trous des CSV : 24 jours ouvres absents sur
 5 ans pour les valeurs Euronext (~4,8/an), 43 a 49 pour les ETF americains et
@@ -313,6 +345,21 @@ portefeuilles, ou seulement celui de Daniel ?
 
 ## 8. Pieges rencontres — a ne pas refaire
 
+- **Jours de la semaine dans un cron Cloudflare : les NOMMER, `MON-FRI`, jamais
+  `1-5`.** Diagnostique le 04/09/2026. L'expression `*/5 8-18 * * 1-5`, en place
+  et fonctionnelle depuis aout, a cesse un jeudi soir de couvrir le vendredi :
+  `1-5` designait desormais dimanche-jeudi. **Panne parfaitement silencieuse** —
+  aucune erreur, aucune execution en echec, les dernieres lignes des Cron events
+  toutes en `Success`, simplement plus rien apres le dernier tick du jeudi. Le
+  franchissement d'ASML a +3,64 % du vendredi 04/09 n'a jamais ete signale. Le
+  seul arbitre fiable : saisir l'expression dans le tableau de bord et lire les
+  prochains declenchements qu'il annonce. Avec `1-5` il annoncait dimanche 8h ;
+  avec `MON-FRI`, vendredi 16h05.
+- **Une panne silencieuse ne vient pas forcement du dernier changement.** Le
+  meme jour, huit deploiements automatiques recents et un decalage horaire ete /
+  hiver ont tous deux ete soupconnes a tort avant qu'on ne regarde l'expression
+  elle-meme. Ordre efficace : dater la panne (`Cron events`), puis chercher ce
+  qui a change a cette date — pas l'inverse.
 - **Cle secrete d'URL** : strictement alphanumerique. Une premiere cle contenant
   `?`, `&`, `@` et `€` cassait le chemin — le point d'interrogation transformait
   la suite en chaine de parametres, d'ou un 404 incomprehensible.
@@ -325,7 +372,7 @@ portefeuilles, ou seulement celui de Daniel ?
   `workers/alerte-asml` et non `/workers/alerte-asml`.
 - **Les secrets ne sont pas partages entre Workers.** Chacun a son propre
   coffre-fort ; un jeton pose sur `mcp-github` est invisible depuis
-  `alerte-asml`.
+  `alerte-asml`. Un secret ne se relit jamais : s'il est perdu, le remplacer.
 - **Encodage base64** : `btoa` et `atob` travaillent octet par octet et cassent
   l'UTF-8. Passer par `TextEncoder` et `TextDecoder`.
 - **Ecriture GitHub** : lire d'abord le fichier pour recuperer son `sha` et le
