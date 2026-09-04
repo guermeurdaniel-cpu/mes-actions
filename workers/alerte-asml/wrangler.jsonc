@@ -22,8 +22,15 @@
     "enabled": true
   },
 
-  // Declencheur automatique : toutes les 5 minutes, de 8h a 18h UTC,
+  // Declencheur automatique : toutes les 5 minutes, de 7h a 16h UTC,
   // du lundi au vendredi.
+  //
+  // POURQUOI 7-16 UTC. Euronext ouvre a 9h et ferme a 17h30, heure de Paris.
+  // En ETE (UTC+2) la fenetre couvre 9h00-18h55 ; en HIVER (UTC+1) elle couvre
+  // 8h00-17h55. Une seule expression suffit donc toute l'annee, sans rien
+  // toucher aux changements d'heure. L'ancienne fenetre 8-18 laissait la
+  // premiere heure de bourse sans surveillance pendant tout l'ete : un
+  // franchissement a l'ouverture n'etait signale qu'a 10h.
   //
   // PIEGE, constate le 04/09/2026 : les jours doivent etre NOMMES (MON-FRI) et
   // non numerotes. La notation 1-5, en place depuis aout, a cesse de designer
@@ -32,7 +39,7 @@
   // "simplifier" MON-FRI en 1-5. Apres toute modification, verifier les
   // prochains declenchements annonces par le tableau de bord : ils font foi.
   "triggers": {
-    "crons": ["*/5 8-18 * * MON-FRI"]
+    "crons": ["*/5 7-16 * * MON-FRI"]
   },
 
   // Stockage de l'etat de l'alerte (remplace alerte_asml_state.json).
