@@ -23,9 +23,16 @@
   },
 
   // Declencheur automatique : toutes les 5 minutes, de 8h a 18h UTC,
-  // du lundi au vendredi. Meme creneau que l'ancien workflow GitHub Actions.
+  // du lundi au vendredi.
+  //
+  // PIEGE, constate le 04/09/2026 : les jours doivent etre NOMMES (MON-FRI) et
+  // non numerotes. La notation 1-5, en place depuis aout, a cesse de designer
+  // lundi-vendredi : le vendredi n'etait plus couvert du tout, l'alerte se
+  // taisait ce jour-la sans la moindre erreur dans les journaux. Ne pas
+  // "simplifier" MON-FRI en 1-5. Apres toute modification, verifier les
+  // prochains declenchements annonces par le tableau de bord : ils font foi.
   "triggers": {
-    "crons": ["*/5 8-18 * * 1-5"]
+    "crons": ["*/5 8-18 * * MON-FRI"]
   },
 
   // Stockage de l'etat de l'alerte (remplace alerte_asml_state.json).
