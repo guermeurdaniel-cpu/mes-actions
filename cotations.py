@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Telecharge l historique de cloture d une valeur et l ecrit dans <label>.csv.
 
-Trois points de vigilance, tous constates en production le 05/08/2026 :
+Quatre points de vigilance, constates en production :
 
   1. Yahoo renvoie regulierement une seance avec close = null (trous observes
      les 31/07 et 04/08/2026 sur ASML.AS). L ancienne version se contentait de
@@ -14,6 +14,12 @@ Trois points de vigilance, tous constates en production le 05/08/2026 :
 
   3. Le fichier existant n est plus ecrase aveuglement : il est fusionne. Si
      Yahoo perd une valeur qu on avait deja, on la conserve.
+
+  4. La recherche par ISIN rend plusieurs lignes de cotation du meme titre, dans
+     un ordre arbitraire. Prendre la premiere donnait un fichier vide quand elle
+     n a pas de serie (constate sur LU3038520774 le 08/09/2026). On les essaie
+     donc toutes, places europeennes d abord, et on garde la premiere qui rend
+     vraiment des seances.
 """
 import os, sys, json, csv, time, datetime, urllib.request, urllib.parse
 
@@ -42,17 +48,59 @@ def serie(res):
     return off, ts, closes
 
 
-def resolve_symbol(entry):
+def candidats_isin(entry):
+    """Symboles Yahoo proposes pour un ISIN, places europeennes d abord.
+
+    L ordre de la recherche Yahoo n est pas garanti : il peut mettre en tete une
+    ligne fantome sans aucune seance ou, pire, une cotation dans une autre
+    devise que l euro. On reclasse donc par suffixe de place.
+    """
+    q = urllib.parse.quote(entry)
+    data = http_json(f"https://query1.finance.yahoo.com/v1/finance/search?q={q}")
+    syms = [d.get("symbol") for d in data.get("quotes", []) if d.get("symbol")]
+    ordre = [".PA", ".AS", ".BR", ".LS", ".DE", ".MI", ".F", ".SW", ".L"]
+    def rang(s):
+        for i, suf in enumerate(ordre):
+            if s.endswith(suf):
+                return i
+        return len(ordre)
+    return sorted(dict.fromkeys(syms), key=rang)
+
+
+def resolve(entry):
+    """Retourne (symbole Yahoo, libelle du fichier, historique brut, devise).
+
+    Pour un ISIN, on essaie les candidats l un apres l autre et on garde le
+    premier qui rend vraiment des seances. L historique est ramene ici pour ne
+    pas le retelecharger ensuite.
+    """
     entry = entry.strip()
     is_isin = len(entry) == 12 and entry[:2].isalpha() and entry.isalnum()
     if not is_isin:
-        return entry, entry  # c'est deja un symbole Yahoo
-    q = urllib.parse.quote(entry)
-    data = http_json(f"https://query1.finance.yahoo.com/v1/finance/search?q={q}")
-    quotes = data.get("quotes", [])
-    if not quotes:
+        brut, devise = fetch_history(entry)
+        return entry, entry, brut, devise
+
+    candidats = candidats_isin(entry)
+    if not candidats:
         raise SystemExit(f"Aucun symbole trouve pour l'ISIN {entry}")
-    return quotes[0].get("symbol"), entry
+    print(f"Candidats pour {entry} : {', '.join(candidats)}")
+
+    journal = []
+    for sym in candidats[:8]:
+        try:
+            brut, devise = fetch_history(sym)
+        except Exception as e:
+            journal.append(f"{sym} : erreur ({e})")
+            continue
+        utiles = sum(1 for _, c in brut if c is not None)
+        journal.append(f"{sym} : {utiles} seances, {devise or '?'}")
+        if utiles:
+            print(f"Retenu : {sym} ({utiles} seances, {devise})")
+            return sym, entry, brut, devise
+        time.sleep(0.3)
+
+    raise SystemExit("Aucune serie exploitable pour l'ISIN {} :\n  {}"
+                     .format(entry, "\n  ".join(journal)))
 
 
 def lire_csv(fname):
@@ -93,18 +141,18 @@ def cloture_intraday(symbol, jour):
 def fetch_history(symbol, rng="5y"):
     res = http_json(f"{CHART}{urllib.parse.quote(symbol)}?range={rng}&interval=1d")["chart"]["result"][0]
     off, ts, closes = serie(res)
-    return [(jour_de(t, off), c) for t, c in zip(ts, closes)]
+    devise = res["meta"].get("currency")
+    return [(jour_de(t, off), c) for t, c in zip(ts, closes)], devise
 
 
 def main():
     entry = os.environ.get("ISIN", "").strip() or (sys.argv[1] if len(sys.argv) > 1 else "")
     if not entry:
         raise SystemExit("Aucun ISIN/symbole fourni")
-    symbol, label = resolve_symbol(entry)
+    symbol, label, brut, devise = resolve(entry)
     fname = f"{label}.csv"
 
     connu  = lire_csv(fname)
-    brut   = fetch_history(symbol)
     limite = (datetime.datetime.now(datetime.timezone.utc)
               - datetime.timedelta(days=JOURS_60M)).strftime("%Y-%m-%d")
 
@@ -137,7 +185,9 @@ def main():
         w.writerow(["Date", "Close"])
         w.writerows(lignes)
 
-    print(f"{fname} ecrit : {len(lignes)} lignes (symbole Yahoo {symbol})")
+    print(f"{fname} ecrit : {len(lignes)} lignes (symbole Yahoo {symbol}, devise {devise})")
+    if devise and devise != "EUR":
+        print(f"  ATTENTION la serie n est pas en euros ({devise}) : verifier la place retenue")
     print(f"  seances a close nulle : {len(trous)}  |  reconstituees : {repares}  |  toujours absentes : {len(perdus)}")
     if perdus:
         apercu = ", ".join(perdus[:15]) + (" ..." if len(perdus) > 15 else "")
