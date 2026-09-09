@@ -12,9 +12,9 @@
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 326.83,
+    "value": 326.3,
     "currency": "EUR",
-    "date": "2026-09-07",
+    "date": "2026-09-08",
     "status": "ok"
   },
   "QS0009080720": {
@@ -30,18 +30,18 @@
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10962.3291,
+    "value": 10963.0796,
     "currency": "EUR",
-    "date": "2026-09-08",
+    "date": "2026-09-09",
     "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1926.74,
+    "value": 1924.8,
     "currency": "EUR",
-    "date": "2026-09-04",
+    "date": "2026-09-07",
     "status": "ok"
   },
   "FR001400HHQ5": {
