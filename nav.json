@@ -12,9 +12,9 @@
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 322.61,
+    "value": 320.76,
     "currency": "EUR",
-    "date": "2026-09-11",
+    "date": "2026-09-14",
     "status": "ok"
   },
   "QS0009080720": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 109.86,
+    "value": 109.63,
     "currency": "EUR",
     "date": "2026-09-08",
     "status": "ok"
