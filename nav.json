@@ -39,9 +39,9 @@
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1917.59,
+    "value": 1914.87,
     "currency": "EUR",
-    "date": "2026-09-11",
+    "date": "2026-09-14",
     "status": "ok"
   },
   "FR001400HHQ5": {
@@ -50,7 +50,7 @@
     "category": "AV",
     "value": 109.63,
     "currency": "EUR",
-    "date": "2026-09-08",
+    "date": "2026-09-15",
     "status": "ok"
   }
 }
