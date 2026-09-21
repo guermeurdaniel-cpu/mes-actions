@@ -21,18 +21,18 @@
     "isin": "QS0009080720",
     "label": "Label Monetaire ESR",
     "category": "PEG",
-    "value": 1316.0133,
+    "value": 1316.2529,
     "currency": "EUR",
-    "date": "2026-09-18",
+    "date": "2026-09-21",
     "status": "ok"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10969.4469,
+    "value": 10971.6779,
     "currency": "EUR",
-    "date": "2026-09-18",
+    "date": "2026-09-21",
     "status": "ok"
   },
   "FR0010149120": {
