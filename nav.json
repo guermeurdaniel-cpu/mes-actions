@@ -30,9 +30,9 @@
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10971.6779,
+    "value": 10972.4624,
     "currency": "EUR",
-    "date": "2026-09-21",
+    "date": "2026-09-22",
     "status": "ok"
   },
   "FR0010149120": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 109.61,
+    "value": 109.79,
     "currency": "EUR",
     "date": "2026-09-16",
     "status": "ok"
