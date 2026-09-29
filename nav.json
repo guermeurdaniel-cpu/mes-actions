@@ -3,36 +3,36 @@
     "isin": "QS0009080175",
     "label": "Actions Internationales ESR",
     "category": "PEG",
-    "value": 40.61,
+    "value": 40.44,
     "currency": "EUR",
-    "date": "2026-09-25",
+    "date": "2026-09-28",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 322.74,
+    "value": 321.86,
     "currency": "EUR",
-    "date": "2026-09-25",
+    "date": "2026-09-28",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Label Monetaire ESR",
     "category": "PEG",
-    "value": 1316.8185,
+    "value": 1316.9066,
     "currency": "EUR",
-    "date": "2026-09-28",
+    "date": "2026-09-29",
     "status": "ok"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10976.9422,
+    "value": 10977.7606,
     "currency": "EUR",
-    "date": "2026-09-28",
+    "date": "2026-09-29",
     "status": "ok"
   },
   "FR0010149120": {
