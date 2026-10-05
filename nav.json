@@ -3,52 +3,52 @@
     "isin": "QS0009080175",
     "label": "Actions Internationales ESR",
     "category": "PEG",
-    "value": 40.63,
+    "value": 40.86,
     "currency": "EUR",
-    "date": "2026-10-01",
+    "date": "2026-10-02",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 321.21,
+    "value": 322.81,
     "currency": "EUR",
-    "date": "2026-10-01",
+    "date": "2026-10-02",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Label Monetaire ESR",
     "category": "PEG",
-    "value": 1317.3063,
+    "value": 1317.5277,
     "currency": "EUR",
-    "date": "2026-10-02",
+    "date": "2026-10-05",
     "status": "ok"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10980.0701,
+    "value": 10982.1371,
     "currency": "EUR",
-    "date": "2026-10-02",
+    "date": "2026-10-05",
     "status": "ok"
   },
   "FR0010149120": {
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1910.45,
+    "value": 1912.5,
     "currency": "EUR",
-    "date": "2026-09-30",
+    "date": "2026-10-01",
     "status": "ok"
   },
   "FR001400HHQ5": {
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 109.73,
+    "value": 109.63,
     "currency": "EUR",
     "date": "2026-09-30",
     "status": "ok"
