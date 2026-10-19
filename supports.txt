@@ -129,6 +129,15 @@ geo       = euro
 # Air Liquide (FR0000120073), Euronext Paris. Action du CAC 40, donc classee
 # zone euro, comme Airbus.
 
+[GENFIT]
+cle       = GNFT.PA
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = euro
+# GENFIT (FR0004163111), biotech lilloise cotee sur Euronext Paris. Societe
+# francaise, donc classee zone euro.
+
 
 # ============================== ASSURANCE VIE ================================
 
