@@ -6,7 +6,7 @@
     "value": 40.74,
     "currency": "EUR",
     "date": "2026-10-19",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
@@ -15,7 +15,7 @@
     "value": 321.24,
     "currency": "EUR",
     "date": "2026-10-20",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
@@ -24,15 +24,15 @@
     "value": 1318.7383,
     "currency": "EUR",
     "date": "2026-10-20",
-    "status": "ok"
+    "status": "ancien"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10994.0349,
+    "value": 10993.35,
     "currency": "EUR",
-    "date": "2026-10-21",
+    "date": "2026-10-20",
     "status": "ok"
   },
   "FR0010149120": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 109.92,
+    "value": 109.98,
     "currency": "EUR",
     "date": "2026-10-20",
     "status": "ok"
