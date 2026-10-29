@@ -6,7 +6,7 @@
     "value": 41.09,
     "currency": "EUR",
     "date": "2026-10-27",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
@@ -15,7 +15,7 @@
     "value": 322.69,
     "currency": "EUR",
     "date": "2026-10-27",
-    "status": "ok"
+    "status": "ancien"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
@@ -24,13 +24,13 @@
     "value": 1319.3083,
     "currency": "EUR",
     "date": "2026-10-28",
-    "status": "ok"
+    "status": "ancien"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 10998.6739,
+    "value": 10998.67,
     "currency": "EUR",
     "date": "2026-10-28",
     "status": "ok"
@@ -39,9 +39,9 @@
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1915.37,
+    "value": 1915.58,
     "currency": "EUR",
-    "date": "2026-10-26",
+    "date": "2026-10-27",
     "status": "ok"
   },
   "FR001400HHQ5": {
