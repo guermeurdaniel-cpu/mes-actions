@@ -3,9 +3,9 @@
     "isin": "QS0009080175",
     "label": "Actions Internationales ESR",
     "category": "PEG",
-    "value": 40.92,
+    "value": 39.41,
     "currency": "EUR",
-    "date": "2026-11-04",
+    "date": "2026-11-05",
     "status": "ok"
   },
   "QS0009080746": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 110.25,
+    "value": 110.37,
     "currency": "EUR",
     "date": "2026-11-03",
     "status": "ok"
