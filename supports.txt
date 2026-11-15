@@ -112,6 +112,15 @@ actions   = 1.00
 geo       = emergents
 # ETF Amundi PEA Asie Emergente (FR0013412012), replication synthetique.
 
+[ETF MSCI Europe]
+cle       = PCEU.PA
+enveloppe = PEA
+source    = yahoo
+actions   = 1.00
+geo       = euro
+# ETF Amundi PEA MSCI Europe (FR0013412038), replication synthetique. Europe
+# large, Royaume-Uni et Suisse compris ; classee euro (Europe) par convention.
+
 [ASML]
 cle       = ASML.AS
 enveloppe = PEA
