@@ -3,36 +3,36 @@
     "isin": "QS0009080175",
     "label": "Actions Internationales ESR",
     "category": "PEG",
-    "value": 40.88,
+    "value": 40.84,
     "currency": "EUR",
-    "date": "2026-11-12",
+    "date": "2026-11-13",
     "status": "ok"
   },
   "QS0009080746": {
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 325.3,
+    "value": 323.54,
     "currency": "EUR",
-    "date": "2026-11-13",
+    "date": "2026-11-16",
     "status": "ok"
   },
   "QS0009080720": {
     "isin": "QS0009080720",
     "label": "Label Monetaire ESR",
     "category": "PEG",
-    "value": 1321.0348,
+    "value": 1321.1286,
     "currency": "EUR",
-    "date": "2026-11-16",
+    "date": "2026-11-17",
     "status": "ok"
   },
   "FR0011408798": {
     "isin": "FR0011408798",
     "label": "Amundi Euro Liquidity",
     "category": "AV",
-    "value": 11013.1697,
+    "value": 11014.04,
     "currency": "EUR",
-    "date": "2026-11-16",
+    "date": "2026-11-17",
     "status": "ok"
   },
   "FR0010149120": {
@@ -48,7 +48,7 @@
     "isin": "FR001400HHQ5",
     "label": "ODDO Global Target 2029",
     "category": "AV",
-    "value": 110.23,
+    "value": 110.17,
     "currency": "EUR",
     "date": "2026-11-10",
     "status": "ok"
