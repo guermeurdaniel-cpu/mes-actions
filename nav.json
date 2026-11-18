@@ -12,9 +12,9 @@
     "isin": "QS0009080746",
     "label": "Label Equilibre ESR",
     "category": "PEG",
-    "value": 323.54,
+    "value": 320.74,
     "currency": "EUR",
-    "date": "2026-11-16",
+    "date": "2026-11-17",
     "status": "ok"
   },
   "QS0009080720": {
@@ -39,9 +39,9 @@
     "isin": "FR0010149120",
     "label": "Carmignac Securite",
     "category": "AV",
-    "value": 1920.05,
+    "value": 1920.77,
     "currency": "EUR",
-    "date": "2026-11-16",
+    "date": "2026-11-17",
     "status": "ok"
   },
   "FR001400HHQ5": {
