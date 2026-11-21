@@ -1,0 +1,50 @@
+# =============================================================================
+#  CIBLES ET SEUILS CHIFFRES DE LA STRATEGIE
+# =============================================================================
+#  Lu par la page « Mes valeurs » (index.html) et par le script quotidien
+#  veille.py. Le texte complet de la strategie est dans regles.md.
+#  Format : nom = valeur   (virgule ou point decimal ; # = commentaire)
+#  A ne modifier qu une fois par an, ou par la revue mensuelle si une regle
+#  de regles.md l autorise.
+# -----------------------------------------------------------------------------
+
+# --- Repartition actions / defensif (patrimoine consolide, livrets compris)
+actions          = 0.65   # cible normale
+bande            = 0.05   # demi-bande : alerte si l ecart depasse 5 points
+
+# --- Paliers de forte baisse, mesures sur WPEA.PA depuis son plus haut 1 an
+baisse_palier_1  = 0.15   # -15 % -> cible actions 70 %
+cible_palier_1   = 0.70
+baisse_palier_2  = 0.25   # -25 % -> 75 %
+cible_palier_2   = 0.75
+baisse_palier_3  = 0.35   # -35 % -> 80 %
+cible_palier_3   = 0.80
+
+# --- Poche actions
+emergents        = 0.10   # part de PAASI dans la poche actions (neutre ~ 10-11 %)
+emergents_bande  = 0.03   # alerte si l ecart depasse 3 points
+matieres_premieres = 0.00 # CMSE : 0 % tant que les signaux ne sont pas confirmes
+poche_bonnes_affaires_max = 0.10  # actions individuelles, en part de la poche actions
+ligne_individuelle_max    = 0.05  # une seule action, en part du patrimoine total
+
+# --- Assurance vie
+uc_av_min        = 0.32   # part minimale d unites de compte (bonus fonds euros : 30 %)
+uc_av_max        = 0.35
+
+# --- PEA
+plafond_pea      = 150000
+alerte_plafond_pea = 0.90
+
+# --- Bonnes affaires (filtre du script)
+ba_baisse_min    = 0.25   # baisse depuis le plus haut 6 mois
+ba_delai_jours   = 30     # jours ecoules depuis le dernier choc (-10 % en 5 seances)
+ba_dette_ebitda_max = 2.5
+ba_marge_op_min  = 0.10
+ba_rentabilite_min = 0.10 # rentabilite des capitaux propres
+
+# --- Mouvement journalier qui declenche une analyse d une ligne individuelle
+ligne_mouvement_jour = 0.08
+
+# --- Versement mensuel
+jour_versement   = 5
+montant_versement = 1000
