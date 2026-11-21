@@ -1258,6 +1258,7 @@ async function loadAll(){
     if(!boite) return;
     boite.innerHTML="";
     env.keys.forEach(function(cle){
+      if(Math.abs(qtyOf(cle))<1e-9) return;   // support vendu ou pas encore achete : masque
       const row=document.createElement("div"); row.className="row";
       if(estFixe(cle)){
         // Livret : solde du journal + interets courus de l annee, sans courbe
