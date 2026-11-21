@@ -379,11 +379,16 @@ def main():
         alertes.append("Repartition hors bande : actions %s pour une cible de %s (%s). "
                        "Reorienter les prochains versements." % (pc(part_act), pc(cible), pts_txt(ecart)))
 
-    # --- 3. Emergents, assurance vie, PEA
+    # --- 3. Emergents, Europe, assurance vie, PEA
     em = sum(l["valeur"] * l["actions"] * l["geo"].get("em", 0) for l in lignes)
     part_em = em / actions if actions else 0
     if abs(part_em - cib["emergents"]) > cib["emergents_bande"]:
         alertes.append("Emergents a %s de la poche actions (cible %s)." % (pc(part_em), pc(cib["emergents"])))
+    eu = sum(l["valeur"] for l in lignes if l["cle"] == "PCEU.PA")
+    part_eu = eu / actions if actions else 0
+    if part_eu > cib["europe"] + cib["europe_bande"]:
+        alertes.append("Europe (PCEU) a %s de la poche actions, au-dessus de la cible %s : "
+                       "reduire sa part des versements." % (pc(part_eu), pc(cib["europe"])))
     av_uc = sum(l["valeur"] for l in lignes if l["env"] == "AV")
     uc_av = av_uc / (av_uc + fonds_euros) if (av_uc + fonds_euros) else 0
     if uc_av < cib["uc_av_min"] or uc_av > cib["uc_av_max"] + 0.02:
@@ -456,9 +461,10 @@ def main():
 
     # --- 7. Versement
     if est_jour_versement(cib):
-        alertes.append("Jour de versement (%s). Repartition par defaut : WPEA 450, PCEU 120, "
-                       "PAASI 80, defensif 350 - ajustee par la revue mensuelle de Claude."
-                       % eur(cib["montant_versement"]))
+        alertes.append("Jour de versement (%s). Repartition par defaut : WPEA %d, PCEU %d, "
+                       "PAASI %d, defensif %d - ajustee par la revue mensuelle de Claude."
+                       % (eur(cib["montant_versement"]), cib["versement_wpea"], cib["versement_pceu"],
+                          cib["versement_paasi"], cib["versement_defensif"]))
 
     # --- Historique
     ecrire_historique(hist, dict(
@@ -486,6 +492,8 @@ def main():
                 (" (palier %d)" % palier) if palier else "", pts_txt(ecart)))
     r.append("- MSCI World (WPEA) : %s depuis son plus haut 1 an" % pc(-baisse_monde if baisse_monde is not None else None, True))
     r.append("- Emergents : %s de la poche actions (cible %s)" % (pc(part_em), pc(cib["emergents"])))
+    r.append("- Europe (PCEU) : %s de la poche actions (cible %s, atteinte par les versements)"
+             % (pc(part_eu), pc(cib["europe"])))
     r.append("- Assurance vie : unites de compte %s (fourchette %s - %s)"
              % (pc(uc_av), pc(cib["uc_av_min"]), pc(cib["uc_av_max"])))
     r.append("- PEA : environ %s verses sur %s (approximatif : ancrages du 16/06/2026)"
