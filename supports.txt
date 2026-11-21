@@ -58,6 +58,14 @@
 #                    Un melange   ->  geo = monde 0.50 + euro 0.50
 #                    Inutile de la renseigner si actions = 0.
 #
+#      taux          Livrets seulement : taux annuel en %, avec sa date d effet.
+#                    Plusieurs taux separes par +, ex.
+#                        taux = 2026-01-01 1.70 + 2026-02-01 1.50
+#                    Ajouter le nouveau taux a chaque revision (1er fevrier,
+#                    1er aout). Les interets de l annee en cours sont calcules
+#                    par quinzaine et comptes comme gain ; au 31 decembre,
+#                    saisir les interets credites dans apports.csv (prix 0).
+#
 # -----------------------------------------------------------------------------
 #  L ORDRE DES BLOCS EST L ORDRE D AFFICHAGE a l interieur de chaque enveloppe.
 #  Deplacer un bloc reorganise le tableau de bord, sans rien casser.
@@ -190,17 +198,22 @@ actions   = 0.00
 
 # ================================== LIVRETS ==================================
 # Epargne reglementee, 100 % defensive. Pas de cours : le solde est la somme
-# des mouvements du journal (section "# --- Livrets" de apports.csv).
+# des mouvements du journal (section "# --- Livrets" de apports.csv), plus les
+# interets courus de l annee, calcules par quinzaine avec les taux ci-dessous.
+# Taux 2026 (Livret A et LDDS alignes) : 1,70 % en janvier, 1,50 % du 1er fevrier
+# au 31 juillet, 1,70 % a partir du 1er aout.
 
 [Livret A]
 cle       = LIVRET-A
 enveloppe = LIV
 source    = fixe
 actions   = 0.00
+taux      = 2026-01-01 1.70 + 2026-02-01 1.50 + 2026-08-01 1.70
 
 [LDDS]
 cle       = LDDS
 enveloppe = LIV
 source    = fixe
 actions   = 0.00
+taux      = 2026-01-01 1.70 + 2026-02-01 1.50 + 2026-08-01 1.70
 # Livret de developpement durable et solidaire.
