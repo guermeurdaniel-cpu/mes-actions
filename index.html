@@ -1392,7 +1392,7 @@ async function loadAll(){
   }
 
   // --- Patrimoine consolide : courbe de PMV en % du capital investi + courbes EUR ---
-  let totalChartIdx=-1, realChartIdx=-1, nonPlaceIdx=-1, progHtml="";
+  let totalChartIdx=-1, realChartIdx=-1, progHtml="";
   const totalSeries=buildTotalSeries(data,hist,yres,investiA(REF_DATE));
   if(totalSeries && totalSeries.values.length>=2 && pmv.totCost>0){
     const td=totalSeries.dates;
@@ -1404,12 +1404,6 @@ async function loadAll(){
     totalChartIdx=allCharts.length;
     // compareValues : serie EUR conservee pour le comparateur base 100 (une serie en % ne peut pas etre re-basee a 100)
     allCharts.push({label:"Patrimoine total (gains cumules en % du patrimoine)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
-    // Par rapport a l argent non place : (patrimoine - apports nets cumules a la date)
-    // / patrimoine de la date. Les apports nets sont ce qui serait detenu si rien n avait
-    // ete place (ventes deduites a leur prix, gains realises compris dans le resultat).
-    const pctNp=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return v>0? (v-c)/v*100 : 0; });
-    nonPlaceIdx=allCharts.length;
-    allCharts.push({label:"Gain par rapport a l argent non place (% du patrimoine)", dates:td, values:pctNp, up:(pctNp[pctNp.length-1]>=0), unit:"%"});
   }
   // Patrimoine reel : valeur absolue quotidienne (bourse + apports), historisee par patrimoine.py
   if(patHist.length>=2){
@@ -1434,18 +1428,15 @@ async function loadAll(){
       +'<span class="since">PMV vs apports</span>'
       +(totalChartIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')
       +(realChartIdx>=0?'<span class="tap" onclick="event.stopPropagation();openFullChart('+realChartIdx+')">&#9654; patrimoine EUR</span>':'')+'</div>';
-    // Second indicateur : resultat par rapport a l argent qui serait detenu sans aucun placement
+    // Gains ou pertes depuis juin 2026 : patrimoine - apports nets (versements moins
+    // retraits, ventes comprises), rapportes au patrimoine du jour.
     const apportsNets=investiA(todayStr());
     if(apportsNets>0){
-      const gNp=pmv.totDay-apportsNets, pNp=(pmv.totDay>0? gNp/pmv.totDay*100 : 0);
-      const clNp=gNp>=0?"prog-up":"prog-down", sgNp=gNp>=0?"+":"";
-      const clicNp=(nonPlaceIdx>=0)?' onclick="openFullChart('+nonPlaceIdx+')"':'';
+      const gJ=pmv.totDay-apportsNets, pJ=gJ/pmv.totDay*100, sgJ=gJ>=0?"+":"";
       progHtml+=
-        '<br><div class="prog"'+clicNp+'>'
-        +'<span class="pct '+clNp+'">'+sgNp+pNp.toFixed(2)+'%</span>'
-        +'<span class="eurd '+clNp+'">'+sgNp+eur(gNp)+'</span>'
-        +'<span class="since">vs argent non place ('+eur(apportsNets)+' apportes)</span>'
-        +(nonPlaceIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')+'</div>';
+        '<div class="meta">Depuis juin 2026 : <span class="'+(gJ>=0?"prog-up":"prog-down")+'">'
+        +sgJ+eur(gJ)+', soit '+sgJ+pJ.toFixed(2)+'% du patrimoine</span>'
+        +' (ventes et arbitrages compris)</div>';
     }
   }
 
