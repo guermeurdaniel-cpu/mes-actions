@@ -1401,12 +1401,12 @@ async function loadAll(){
     totalChartIdx=allCharts.length;
     // compareValues : serie EUR conservee pour le comparateur base 100 (une serie en % ne peut pas etre re-basee a 100)
     allCharts.push({label:"Patrimoine total (gains cumules en % du patrimoine)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
-    // Par rapport a l argent non place : patrimoine / apports nets cumules a la date - 1.
-    // Les apports nets sont ce qui serait detenu si rien n avait ete place (ventes
-    // deduites a leur prix, gains realises compris dans le resultat).
-    const pctNp=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return c>0? (v/c-1)*100 : 0; });
+    // Par rapport a l argent non place : (patrimoine - apports nets cumules a la date)
+    // / patrimoine de la date. Les apports nets sont ce qui serait detenu si rien n avait
+    // ete place (ventes deduites a leur prix, gains realises compris dans le resultat).
+    const pctNp=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return v>0? (v-c)/v*100 : 0; });
     nonPlaceIdx=allCharts.length;
-    allCharts.push({label:"Gain par rapport a l argent non place (% des apports nets)", dates:td, values:pctNp, up:(pctNp[pctNp.length-1]>=0), unit:"%"});
+    allCharts.push({label:"Gain par rapport a l argent non place (% du patrimoine)", dates:td, values:pctNp, up:(pctNp[pctNp.length-1]>=0), unit:"%"});
   }
   // Patrimoine reel : valeur absolue quotidienne (bourse + apports), historisee par patrimoine.py
   if(patHist.length>=2){
@@ -1434,7 +1434,7 @@ async function loadAll(){
     // Second indicateur : resultat par rapport a l argent qui serait detenu sans aucun placement
     const apportsNets=investiA(todayStr());
     if(apportsNets>0){
-      const gNp=pmv.totDay-apportsNets, pNp=gNp/apportsNets*100;
+      const gNp=pmv.totDay-apportsNets, pNp=(pmv.totDay>0? gNp/pmv.totDay*100 : 0);
       const clNp=gNp>=0?"prog-up":"prog-down", sgNp=gNp>=0?"+":"";
       const clicNp=(nonPlaceIdx>=0)?' onclick="openFullChart('+nonPlaceIdx+')"':'';
       progHtml+=
