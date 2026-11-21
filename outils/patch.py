@@ -1,36 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Patch par remplacements (21/11/2026) : suppression de la seconde courbe (« vs
-argent non place ») ; a la place, une ligne dans l en-tete : gains ou pertes
-depuis juin 2026 (patrimoine - apports nets, ventes comprises) et leur % du
-patrimoine. Applique par le workflow patch.yml ; chaque texte doit etre trouve
-une seule fois, sinon aucun fichier n est ecrit."""
+"""Patch par remplacements (21/11/2026) : l en-tete lit realises.csv (plus et
+moins-values des ventes, genere par realises.py) et affiche les gains et pertes
+depuis juin 2026 : en cours (lignes detenues) + realises (ventes) = total, et son
+% du patrimoine. Applique par le workflow patch.yml ; chaque texte doit etre
+trouve une seule fois, sinon aucun fichier n est ecrit."""
 import sys
 
 PATCHS = {
 "index.html": [
-("""  let totalChartIdx=-1, realChartIdx=-1, nonPlaceIdx=-1, progHtml="";""",
-"""  let totalChartIdx=-1, realChartIdx=-1, progHtml="";"""),
-("""    // Par rapport a l argent non place : (patrimoine - apports nets cumules a la date)
-    // / patrimoine de la date. Les apports nets sont ce qui serait detenu si rien n avait
-    // ete place (ventes deduites a leur prix, gains realises compris dans le resultat).
-    const pctNp=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return v>0? (v-c)/v*100 : 0; });
-    nonPlaceIdx=allCharts.length;
-    allCharts.push({label:"Gain par rapport a l argent non place (% du patrimoine)", dates:td, values:pctNp, up:(pctNp[pctNp.length-1]>=0), unit:"%"});
-""", ""),
-("""    // Second indicateur : resultat par rapport a l argent qui serait detenu sans aucun placement
-    const apportsNets=investiA(todayStr());
-    if(apportsNets>0){
-      const gNp=pmv.totDay-apportsNets, pNp=(pmv.totDay>0? gNp/pmv.totDay*100 : 0);
-      const clNp=gNp>=0?"prog-up":"prog-down", sgNp=gNp>=0?"+":"";
-      const clicNp=(nonPlaceIdx>=0)?' onclick="openFullChart('+nonPlaceIdx+')"':'';
-      progHtml+=
-        '<br><div class="prog"'+clicNp+'>'
-        +'<span class="pct '+clNp+'">'+sgNp+pNp.toFixed(2)+'%</span>'
-        +'<span class="eurd '+clNp+'">'+sgNp+eur(gNp)+'</span>'
-        +'<span class="since">vs argent non place ('+eur(apportsNets)+' apportes)</span>'
-        +(nonPlaceIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')+'</div>';
-    }""",
-"""    // Gains ou pertes depuis juin 2026 : patrimoine - apports nets (versements moins
+("""  try{
+    const pR=await fetch("patrimoine.json?t="+Date.now());
+    if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
+  }catch(e){}""",
+"""  try{
+    const pR=await fetch("patrimoine.json?t="+Date.now());
+    if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
+  }catch(e){}
+  // realises.csv : plus et moins-values des ventes, genere par realises.py a chaque
+  // modification du journal. null si absent (calcul de secours plus bas).
+  let realisesTot=null;
+  try{
+    const rR=await fetch("realises.csv?t="+Date.now(), {cache:"no-store"});
+    if(rR.ok){
+      let t=0;
+      (await rR.text()).split(/\\r?\\n/).forEach(function(l){
+        l=l.trim(); if(!l || l.charAt(0)==="#" || l.indexOf("date;")===0) return;
+        const c=l.split(";"); const v=parseFloat(c[6]); if(!isNaN(v)) t+=v;
+      });
+      realisesTot=t;
+    }
+  }catch(e){}"""),
+("""    // Gains ou pertes depuis juin 2026 : patrimoine - apports nets (versements moins
     // retraits, ventes comprises), rapportes au patrimoine du jour.
     const apportsNets=investiA(todayStr());
     if(apportsNets>0){
@@ -39,7 +39,19 @@ PATCHS = {
         '<div class="meta">Depuis juin 2026 : <span class="'+(gJ>=0?"prog-up":"prog-down")+'">'
         +sgJ+eur(gJ)+', soit '+sgJ+pJ.toFixed(2)+'% du patrimoine</span>'
         +' (ventes et arbitrages compris)</div>';
-    }"""),
+    }""",
+"""    // Gains et pertes depuis juin 2026 : en cours (lignes detenues, PMV ci-dessus)
+    // + realises (ventes, realises.csv) = total, rapporte au patrimoine du jour.
+    // Secours si realises.csv manque : total = patrimoine - apports nets.
+    const enCours=pmv.totGain;
+    const realise=(realisesTot!==null)? realisesTot : (pmv.totDay-investiA(todayStr()))-enCours;
+    const totJ=enCours+realise, pJ=totJ/pmv.totDay*100;
+    function sgn(x){ return x>=0? "+" : ""; }
+    function cls(x){ return x>=0? "prog-up" : "prog-down"; }
+    progHtml+=
+      '<div class="meta">Depuis juin 2026 : en cours <span class="'+cls(enCours)+'">'+sgn(enCours)+eur(enCours)+'</span>'
+      +' + realises <span class="'+cls(realise)+'">'+sgn(realise)+eur(realise)+'</span>'
+      +' = <span class="'+cls(totJ)+'">'+sgn(totJ)+eur(totJ)+', soit '+sgn(totJ)+pJ.toFixed(2)+'% du patrimoine</span></div>';"""),
 ],
 }
 
