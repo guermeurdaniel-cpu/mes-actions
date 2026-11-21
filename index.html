@@ -315,6 +315,20 @@ function lireGeo(txt){
   return g;
 }
 
+// "2026-01-01 1.70 + 2026-02-01 1.50" -> [{d:"2026-01-01", t:1.70}, ...] trie par date
+function lireTaux(txt, erreurs){
+  const l=[];
+  (txt||"").split("+").forEach(function(part){
+    const m=part.trim().split(/\s+/);
+    if(!m[0]) return;
+    if(m.length!==2 || !/^\d{4}-\d{2}-\d{2}$/.test(m[0]) || nombreFr(m[1])===null){
+      erreurs.push("taux mal ecrit : "+part.trim()); return;
+    }
+    l.push({d:m[0], t:nombreFr(m[1])});
+  });
+  return l.sort(function(a,b){ return a.d<b.d? -1 : (a.d>b.d? 1 : 0); });
+}
+
 function parserSupports(txt){
   const liste=[], erreurs=[];
   let courant=null;
@@ -324,7 +338,7 @@ function parserSupports(txt){
     const titre=t.match(/^\[(.+)\]$/);           // nouveau bloc
     if(titre){
       courant={nom:titre[1].trim(), cle:"", enveloppe:"", source:"", url:"",
-               actions:0, geo:{monde:0,euro:0,em:0}, ligne:i+1};
+               actions:0, geo:{monde:0,euro:0,em:0}, taux:[], ligne:i+1};
       liste.push(courant);
       return;
     }
@@ -338,6 +352,7 @@ function parserSupports(txt){
     else if(champ==="url")       courant.url=val;
     else if(champ==="actions")   courant.actions=nombreFr(val)||0;
     else if(champ==="geo")       courant.geo=lireGeo(val);
+    else if(champ==="taux")      courant.taux=lireTaux(val, erreurs);
     else erreurs.push("ligne "+(i+1)+" : champ inconnu \""+champ+"\"");
   });
   // Controles : mieux vaut un message clair qu un tableau de bord a zero
@@ -387,6 +402,53 @@ function estCote(cle){ const s=PAR_CLE[cle]; return !!s && s.source==="yahoo"; }
 // du journal est donc directement le solde en euros. Aucun cours a chercher.
 function estFixe(cle){ const s=PAR_CLE[cle]; return !!s && s.source==="fixe"; }
 function partActions(cle){ const s=PAR_CLE[cle]; return s? s.actions : 0; }
+
+// --- Livrets : interets courus de l annee en cours, regle des quinzaines ------
+// Un livret rapporte par quinzaine (du 1er au 15, du 16 a la fin du mois) :
+//   - un versement porte interet a partir du 1er ou du 16 qui SUIT sa date ;
+//   - un retrait cesse de porter interet des le debut de SA quinzaine ;
+//   - un solde date du 1er janvier (ou d avant) est en place des la 1re quinzaine.
+// Interet d une quinzaine = solde x taux annuel en vigueur a son debut / 24.
+// Seules les quinzaines achevees a la date demandee comptent. Les interets d une
+// annee passee se saisissent dans apports.csv (prix 0) une fois credites.
+// Meme calcul que interets_courus() dans supports.py : garder les deux identiques.
+function quinzaines(annee){
+  const q=[];
+  for(let m=1;m<=12;m++){
+    const mm=String(m).padStart(2,"0");
+    const der=new Date(Date.UTC(annee, m, 0)).getUTCDate();
+    q.push([annee+"-"+mm+"-01", annee+"-"+mm+"-15"]);
+    q.push([annee+"-"+mm+"-16", annee+"-"+mm+"-"+String(der).padStart(2,"0")]);
+  }
+  return q;
+}
+function interetsCourus(cle, date){
+  const s=PAR_CLE[cle]; if(!s || !s.taux || !s.taux.length) return 0;
+  const annee=parseInt(date.slice(0,4),10), debutAnnee=annee+"-01-01";
+  const mv=APPORTS.filter(function(a){ return a.cle===cle; });
+  let total=0;
+  const qz=quinzaines(annee);
+  for(let k=0;k<qz.length;k++){
+    const deb=qz[k][0], fin=qz[k][1];
+    if(fin>=date) break;                                 // quinzaine pas encore achevee
+    let solde=0;
+    mv.forEach(function(a){
+      if(a.qte>0 && (a.date<deb || a.date<=debutAnnee)) solde+=a.qte;   // versement anterieur
+      else if(a.qte<0 && a.date<=fin) solde+=a.qte;                       // retrait de la quinzaine
+    });
+    let t=0;
+    s.taux.forEach(function(x){ if(x.d<=deb) t=x.t; });
+    total+=Math.max(solde,0)*t/100/24;
+  }
+  return total;
+}
+// Valeur d un livret a une date : solde du journal + interets courus de l annee
+function valeurLivret(cle, date){ return qteA(cle, date)+interetsCourus(cle, date); }
+function tauxActuel(cle){
+  const s=PAR_CLE[cle]; let t=null; const d=todayStr();
+  if(s && s.taux) s.taux.forEach(function(x){ if(x.d<=d) t=x.t; });
+  return t;
+}
 function geoDe(cle){ const s=PAR_CLE[cle]; return s? s.geo : {monde:0,euro:0,em:0}; }
 function nomDe(cle){ const s=PAR_CLE[cle]; return s? s.nom : cle; }
 
@@ -548,10 +610,10 @@ function buildTotalSeries(data, hist, yres, costBasis){
   const dates=Object.keys(dset).sort();
   if(!dates.length) return null;
   const values=dates.map(function(){ return FONDS_EUROS; }); // fonds euros = constante a chaque date
-  // Livrets : solde tire du journal a chaque date (1 part = 1 EUR)
+  // Livrets : solde du journal + interets courus, a chaque date
   SUPPORTS.forEach(function(sup){
     if(!estFixe(sup.cle)) return;
-    for(let i=0;i<dates.length;i++) values[i]+=qteA(sup.cle, dates[i]);
+    for(let i=0;i<dates.length;i++) values[i]+=valeurLivret(sup.cle, dates[i]);
   });
   series.forEach(function(s){
     const m={}; for(let i=0;i<s.dates.length;i++) m[s.dates[i]]=s.vals[i];
@@ -1116,10 +1178,13 @@ async function loadAll(){
     data=await navR.json();
     try{ const hR=await fetch("history.json?t="+Date.now()); if(hR.ok) hist=await hR.json(); }catch(e){}
   }catch(e){}
-  // Livrets : pas de VL a recuperer, la part vaut 1 EUR. On les range dans data
-  // comme un fonds, ce qui les fait compter partout (totaux, PMV, allocation).
+  // Livrets : pas de VL a recuperer. La "part" vaut 1 EUR plus la quote-part
+  // des interets courus de l annee ; rangee dans data comme un fonds, elle fait
+  // compter le livret partout (totaux, PMV, allocation), interets compris.
   SUPPORTS.forEach(function(s){
-    if(s.source==="fixe") data[s.cle]={value:1, date:todayStr(), label:s.nom, status:"fixe"};
+    if(s.source!=="fixe") return;
+    const q=qtyOf(s.cle), v=valeurLivret(s.cle, todayStr());
+    data[s.cle]={value:(q>0? v/q : 1), date:todayStr(), label:s.nom, status:"fixe"};
   });
   // patrimoine.json : historique quotidien du patrimoine reel (ecrit par patrimoine.py)
   let patHist=[];
@@ -1149,10 +1214,15 @@ async function loadAll(){
     env.keys.forEach(function(cle){
       const row=document.createElement("div"); row.className="row";
       if(estFixe(cle)){
-        // Livret : le solde est la somme des mouvements du journal, sans courbe
-        const solde=qtyOf(cle);
-        row.innerHTML='<div class="info"><div class="nm">'+nomDe(cle)+'</div><div class="sub"><span class="pr">solde</span><span class="held">'+eur(solde)+'</span></div></div><svg class="spark"></svg>';
-        totaux[env.name] += solde;
+        // Livret : solde du journal + interets courus de l annee, sans courbe
+        const solde=qtyOf(cle), jour=todayStr();
+        const inter=interetsCourus(cle, jour), tx=tauxActuel(cle);
+        row.innerHTML='<div class="info"><div class="nm">'+nomDe(cle)+'</div><div class="sub">'
+          +'<span class="pr">'+eur(solde+inter)+'</span>'
+          +(tx!==null? '<span class="pru">taux '+tx.toLocaleString("fr-FR",{minimumFractionDigits:2})+' %</span>' : '')
+          +'<span class="up">interets '+jour.slice(0,4)+' +'+eur(inter)+'</span>'
+          +'</div></div><svg class="spark"></svg>';
+        totaux[env.name] += solde+inter;
         boite.appendChild(row);
         return;
       }
