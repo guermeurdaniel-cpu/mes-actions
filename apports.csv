@@ -32,12 +32,18 @@
 #      ODDO Global Target 2029          Assurance vie
 #      ETF Euro Corporate SRI           Assurance vie
 #
-#  RANGEMENT : le fichier est classe par enveloppe (les trois commentaires
-#  "# --- PEG / PER", "# --- PEA" et "# --- Assurance vie" ci-dessous), puis par
+#  RANGEMENT : le fichier est classe par enveloppe (les quatre commentaires
+#  "# --- PEG / PER", "# --- PEA", "# --- Assurance vie" et "# --- Livrets"
+#  ci-dessous), puis par
 #  support, puis par date. L onglet Saisie du tableau de bord s appuie sur ces
-#  trois en-tetes pour inserer chaque nouvelle ligne a sa place : ne les renomme
+#  en-tetes pour inserer chaque nouvelle ligne a sa place : ne les renomme
 #  pas. Une ligne ajoutee a la main peut se mettre n importe ou, l ordre du
 #  fichier n a aucune incidence sur les calculs, il ne sert qu a la lisibilite.
+#
+#  LIVRETS (source = fixe dans supports.txt) : une part vaut 1 EUR, la quantite
+#  est donc un montant en euros. Versement : montant ; 1. Retrait : montant
+#  negatif ; 1. Interets annuels : montant ; 0 (ils grossissent le solde sans
+#  compter comme un apport, et apparaissent comme gain).
 #
 #  Le fonds euros de l assurance vie n est pas gere ici : il se saisit dans
 #  index.html, constantes FONDS_EUROS (valeur du jour) et FONDS_EUROS_VERSE
@@ -78,3 +84,8 @@
 2026-06-16;Carmignac Securite;1.6917;1924.08
 2026-06-16;ETF Euro Corporate SRI;14.3676;226.55
 2026-06-16;ODDO Global Target 2029;0.2715;110.29
+
+# --- Livrets -------------------------------------------------------------
+# Soldes constates le 21/11/2026, saisis comme un versement unique.
+2026-11-21;Livret A;24542;1
+2026-11-21;LDDS;12246;1
