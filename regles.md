@@ -49,24 +49,34 @@ Mesurés sur l'ETF MSCI World du PEA (WPEA) depuis son plus haut sur un an :
 - **Émergents : 10 % de la poche actions**, via PAASI (Asie émergente
   seulement). C'est la position neutre : les émergents pèsent environ 11 % du
   marché mondial (MSCI ACWI). Alerte si l'écart dépasse 3 points.
-- **Europe** : PCEU (MSCI Europe) complète le MSCI World, très concentré sur les
-  États-Unis (environ 73 %) et la technologie.
+- **Europe : 10 % de la poche actions**, via PCEU (MSCI Europe). Le MSCI
+  World est très concentré sur les États-Unis (environ 73 %) et la technologie,
+  et mes dépenses futures sont en euros. Avec PCEU, l'exposition totale à
+  l'Europe (PCEU, part européenne du MSCI World, Label Équilibre, actions
+  individuelles) monte vers un tiers de la poche actions. Décidé le 21/11/2026,
+  à partir de zéro : la cible est atteinte par les versements en 5 à 6 ans,
+  plus vite si l'Europe recule ou en cas de palier de forte baisse. Pas
+  d'alerte tant que PCEU est sous la cible ; alerte s'il la dépasse de plus de
+  3 points.
 - **Matières premières (CMSE)** : **0 %** aujourd'hui. Entrée possible par
   paliers de 5 points de la poche actions, décidée en revue mensuelle, si les
   signaux du §6 restent franchis plusieurs semaines.
 
 ## 4. Versement mensuel (le 5)
 
-Répartition par défaut, qui maintient 65/35 quand la répartition est à la
-cible (proposition à confirmer à la revue du 5 décembre 2026) :
+Répartition par défaut à partir du 5 décembre 2026 (validée le 21/11/2026) :
 
 | Support | Montant |
 |---|---|
-| WPEA (MSCI World) | 450 € |
-| PCEU (MSCI Europe) | 120 € |
-| PAASI (Asie émergente) | 80 € |
+| WPEA (MSCI World) | 290 € |
+| PCEU (MSCI Europe) | 200 € |
+| PAASI (Asie émergente) | 160 € |
 | Défensif (assurance vie : fonds euros, en gardant 32 à 35 % de monétaire) | 350 € |
 
+- PAASI à 160 € tant que les émergents sont sous 10 % de la poche actions ;
+  ensuite 80 €, les 80 € libérés allant à WPEA.
+- PCEU à 200 € tant que PCEU est sous 10 % de la poche actions ; ensuite
+  environ 65 €, le reste allant à WPEA.
 - Si la répartition s'écarte de la cible, la revue mensuelle oriente tout ou
   partie du versement vers le côté en retard.
 - La poche « bonnes affaires » est alimentée seulement au moment d'un achat
@@ -145,6 +155,7 @@ déclenche une analyse de la ligne par Claude le soir même.
 
 | Qui | Quand | Quoi |
 |---|---|---|
+| Workflow « Analyse historique » (telemesure-zone-euro) | Le 1er de chaque mois, 5 h | Mise à jour des fondamentaux des 263 valeurs suivies, utilisés pour juger les bonnes affaires |
 | Script veille.py (GitHub Actions) | Chaque jour ouvré, 17 h 45 (18 h 45 l'été) | Mesures chiffrées, rapport dans rapports/derniere.md, alertes Telegram seulement s'il y a quelque chose |
 | Claude (tâche planifiée) | Chaque jour ouvré, vers 20 h | Note quotidienne dans notes/, envoyée sur Telegram : marchés, signaux, verdict, lignes individuelles |
 | Claude (tâche planifiée) | Le 5 de chaque mois, le matin | Revue mensuelle : répartition du versement, éventuel changement de cible |
