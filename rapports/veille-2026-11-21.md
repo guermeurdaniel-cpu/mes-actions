@@ -4,20 +4,13 @@
 - Emergents a 7,0 % de la poche actions (cible 10,0 %).
 - ASML a bouge de -9,3 % aujourd hui : analyse a faire ce soir.
 - GENFIT a bouge de -9,5 % aujourd hui : analyse a faire ce soir.
-- Nouvelle candidate : BE Semiconductor, -55,4 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 40,5 %). Delai d un mois apres le dernier choc : encore 15 jours.
-- Nouvelle candidate : Rheinmetall, -46,4 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,2, marge 16,9 %). Delai d un mois apres le dernier choc : encore 27 jours.
-- Nouvelle candidate : ASM International, -40,7 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 31,2 %). Delai d un mois apres le dernier choc : encore 16 jours.
-- Nouvelle candidate : Melexis, -37,5 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,0, marge 16,9 %). Delai d un mois apres le dernier choc : atteint.
-- Nouvelle candidate : Siemens Energy, -34,7 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 11,5 %). Delai d un mois apres le dernier choc : encore 15 jours.
-- Nouvelle candidate : Neste, -31,1 % depuis son plus haut 6 mois, saine (dette/EBITDA 0,7, marge 14,1 %). Delai d un mois apres le dernier choc : encore 30 jours.
-- Nouvelle candidate : Moncler, -29,4 % depuis son plus haut 6 mois, saine (dette/EBITDA 0,1, marge 29,0 %). Delai d un mois apres le dernier choc : encore 30 jours.
-- Nouvelle candidate : Wavestone, -29,4 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 12,5 %). Delai d un mois apres le dernier choc : atteint.
 
 ## Repartition
 - Patrimoine consolide : 260 446 EUR (AV 28 020 EUR, LIV 37 298 EUR, PEA 62 867 EUR, PEG 132 260 EUR)
 - Actions 64,5 % / defensif 35,5 % ; cible 65,0 % ; ecart -0,5 points
 - MSCI World (WPEA) : -7,2 % depuis son plus haut 1 an
 - Emergents : 7,0 % de la poche actions (cible 10,0 %)
+- Europe (PCEU) : 0,0 % de la poche actions (cible 10,0 %, atteinte par les versements)
 - Assurance vie : unites de compte 35,3 % (fourchette 32,0 % - 35,0 %)
 - PEA : environ 66 602 EUR verses sur 150 000 EUR (approximatif : ancrages du 16/06/2026)
 
