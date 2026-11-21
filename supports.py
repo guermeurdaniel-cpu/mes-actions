@@ -15,10 +15,12 @@ Format lu (voir l en-tete de supports.txt pour la documentation complete) :
     url       = https://...       uniquement pour abcbourse et boursier
     actions   = 1.00              part investie en actions, entre 0 et 1
     geo       = monde 0.50 + euro 0.50
+    taux      = 2026-01-01 1.70 + 2026-02-01 1.50    livrets : taux annuel en %, par date d effet
 
 Les lignes vides et celles commencant par # sont ignorees.
 """
 
+import calendar
 import re
 
 FICHIER = "supports.txt"
@@ -50,6 +52,19 @@ def _geo(txt):
     return g
 
 
+def _taux(txt):
+    """'2026-01-01 1.70 + 2026-02-01 1.50' -> [('2026-01-01', 1.7), ('2026-02-01', 1.5)]"""
+    liste = []
+    for part in (txt or "").split("+"):
+        mots = part.strip().split()
+        if not mots:
+            continue
+        if len(mots) != 2 or not re.match(r"^\d{4}-\d{2}-\d{2}$", mots[0]):
+            raise RuntimeError("taux mal ecrit : '%s' (attendu AAAA-MM-JJ taux)" % part.strip())
+        liste.append((mots[0], _nombre(mots[1])))
+    return sorted(liste)
+
+
 def lire(chemin=FICHIER):
     """Renvoie la liste des supports, dans l ordre du fichier.
 
@@ -72,6 +87,7 @@ def lire(chemin=FICHIER):
                     "nom": titre.group(1).strip(), "cle": "", "enveloppe": "",
                     "source": "", "url": "", "actions": 0.0,
                     "geo": {"monde": 0.0, "euro": 0.0, "em": 0.0},
+                    "taux": [],
                 }
                 supports.append(courant)
                 continue
@@ -95,6 +111,8 @@ def lire(chemin=FICHIER):
                 courant["actions"] = _nombre(valeur)
             elif champ == "geo":
                 courant["geo"] = _geo(valeur)
+            elif champ == "taux":
+                courant["taux"] = _taux(valeur)
             else:
                 raise RuntimeError("%s ligne %d : champ inconnu '%s'" % (chemin, num, champ))
 
@@ -131,10 +149,69 @@ def fonds(supports):
 
 
 def fixes(supports):
-    """Cles des supports a valeur fixe (livrets) : une part vaut 1 EUR."""
+    """Cles des supports a valeur fixe (livrets) : solde du journal + interets courus."""
     return [s["cle"] for s in supports if s["source"] == "fixe"]
 
 
 def par_intitule(supports):
     """Intitule lisible -> cle. C est la correspondance utilisee par apports.csv."""
     return dict((s["nom"], s["cle"]) for s in supports)
+
+
+# -----------------------------------------------------------------------------
+#  LIVRETS : interets courus de l annee en cours, regle des quinzaines
+# -----------------------------------------------------------------------------
+#  Un livret rapporte par quinzaine (du 1er au 15, du 16 a la fin du mois) :
+#    - un versement porte interet a partir du 1er ou du 16 qui SUIT sa date ;
+#    - un retrait cesse de porter interet des le debut de SA quinzaine ;
+#    - un solde date du 1er janvier (ou d avant) est en place des la 1re quinzaine.
+#  Interet d une quinzaine = solde x taux annuel en vigueur a son debut / 24.
+#  Seules les quinzaines ACHEVEES a la date demandee sont comptees : c est ce que
+#  la banque versera au 31 decembre. Les interets d une annee passee doivent
+#  etre saisis dans apports.csv (quantite = montant, prix 0) une fois credites.
+#  Meme calcul que interetsCourus() dans index.html : les deux doivent rester
+#  identiques.
+
+def _quinzaines(annee):
+    """Les 24 quinzaines d une annee : liste de (debut, fin) en AAAA-MM-JJ."""
+    q = []
+    for m in range(1, 13):
+        der = calendar.monthrange(annee, m)[1]
+        q.append(("%04d-%02d-01" % (annee, m), "%04d-%02d-15" % (annee, m)))
+        q.append(("%04d-%02d-16" % (annee, m), "%04d-%02d-%02d" % (annee, m, der)))
+    return q
+
+
+def interets_courus(taux, mouvements, date):
+    """Interets acquis depuis le 1er janvier de l annee de `date`, en EUR.
+
+    taux        liste (date d effet, taux annuel en %) triee
+    mouvements  liste (date AAAA-MM-JJ, quantite) du support
+    date        AAAA-MM-JJ
+    """
+    if not taux:
+        return 0.0
+    annee = int(date[:4])
+    debut_annee = "%04d-01-01" % annee
+    total = 0.0
+    for deb, fin in _quinzaines(annee):
+        if fin >= date:                 # quinzaine pas encore achevee
+            break
+        solde = 0.0
+        for d, q in mouvements:
+            if q > 0 and (d < deb or d <= debut_annee):
+                solde += q              # versement : compte s il precede la quinzaine
+            elif q < 0 and d <= fin:
+                solde += q              # retrait : penalise toute sa quinzaine
+        t = 0.0
+        for d_effet, tx in taux:
+            if d_effet <= deb:
+                t = tx
+        total += max(solde, 0.0) * t / 100.0 / 24.0
+    return total
+
+
+def valeur_livret(taux, mouvements, date):
+    """Solde du journal a `date` plus interets courus de l annee."""
+    solde = sum(q for d, q in mouvements if d <= date)
+    return solde + interets_courus(taux, mouvements, date)
