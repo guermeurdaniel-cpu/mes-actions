@@ -88,6 +88,13 @@
 2026-06-16;Carmignac Securite;1.6917;1924.08
 2026-06-16;ETF Euro Corporate SRI;14.3676;226.55
 2026-06-16;ODDO Global Target 2029;0.2715;110.29
+# Arbitrage du 21/11/2026 vers Amundi Euro Liquidity (regles.md §8). Montants
+# ESTIMES aux dernieres valeurs connues : a remplacer par ceux de l avis
+# d operation BoursoVie (nombre de parts et valeur de la part).
+2026-11-21;Carmignac Securite;-1.6917;1917.50
+2026-11-21;ETF Euro Corporate SRI;-14.3676;226.00
+2026-11-21;ODDO Global Target 2029;-0.2715;110.08
+2026-11-21;Amundi Euro Liquidity;0.59192;11016.29
 
 # --- Livrets -------------------------------------------------------------
 # Soldes au 1er janvier 2026 : les interets 2026 sont calcules a partir de la.
