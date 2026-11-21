@@ -1,0 +1,38 @@
+name: Plus-values realisees
+
+# Recalcule realises.csv (plus et moins-values des ventes et arbitrages) a chaque
+# modification de apports.csv, que ce soit par l onglet Saisie de la page ou a la
+# main. Aussi a la main (Run workflow).
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'apports.csv', 'realises.py', '.github/workflows/realises.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: realises
+  cancel-in-progress: false
+
+jobs:
+  realises:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Calcul
+        run: python3 -B realises.py
+
+      - name: Commit
+        run: |
+          git config user.name "realises-bot"
+          git config user.email "realises-bot@users.noreply.github.com"
+          git add realises.csv
+          git commit -m "realises.csv : plus-values realisees $(date -u +%Y-%m-%d)" || exit 0
+          for i in 1 2 3; do
+            git pull --rebase && git push && break
+            sleep 10
+          done
