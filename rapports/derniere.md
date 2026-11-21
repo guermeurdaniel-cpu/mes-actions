@@ -11,7 +11,7 @@
 - MSCI World (WPEA) : -7,2 % depuis son plus haut 1 an
 - Emergents : 7,0 % de la poche actions (cible 10,0 %)
 - Europe, toutes sources (MSCI World compris) : 22,9 % de la poche actions (38 510 EUR)
-- dont ETF Europe (PCEU) : 0,0 % de la poche actions (cible 10,0 %, atteinte par les versements)
+- dont ETF Europe (PCEU) : 0,0 % de la poche actions (cible 30,0 %, atteinte par les versements)
 - Assurance vie : unites de compte 35,3 % (fourchette 32,0 % - 35,0 %)
 - PEA : environ 66 602 EUR verses sur 150 000 EUR (approximatif : ancrages du 16/06/2026)
 
