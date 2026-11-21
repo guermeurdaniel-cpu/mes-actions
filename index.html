@@ -16,6 +16,7 @@
   .tot.peg { background:#0a84ff; }
   .tot.av { background:#5e5ce6; }
   .tot.pea { background:#bf5af2; }
+  .tot.liv { background:#30a46c; }
   .tot .lbl { font-size:13px; color:#e8e8ff; }
   .tot .amount { font-size:22px; font-weight:800; }
   .tot .ratio { font-size:12px; margin-top:4px; }
@@ -162,6 +163,10 @@
   <div class="section">Assurance vie</div>
   <div id="av"></div>
 
+  <div id="totLiv"></div>
+  <div class="section">Livrets</div>
+  <div id="liv"></div>
+
   <div id="scaleNote"></div>
   <button class="compare" onclick="openMultiChart()">Comparer les courbes (base 100)</button>
   <button class="refresh" onclick="loadAll()">Actualiser</button>
@@ -187,11 +192,11 @@
         <input type="date" id="fDate">
       </div>
       <div class="fld">
-        <label for="fQte">Quantite de parts</label>
+        <label for="fQte" id="fQteLbl">Quantite de parts</label>
         <input type="text" id="fQte" inputmode="decimal" placeholder="ex. 22,0232">
       </div>
       <div class="fld">
-        <label for="fPrix">Prix d une part en euros</label>
+        <label for="fPrix" id="fPrixLbl">Prix d une part en euros</label>
         <input type="text" id="fPrix" inputmode="decimal" placeholder="ex. 204,33">
       </div>
       <div id="fMontant" class="hint" style="margin:10px 0 0"></div>
@@ -287,7 +292,7 @@ const BANDE          = 0.05;   // demi-bande de reequilibrage, en points
 const TARGET_EM      = 0.10;   // part emergents visee dans la poche actions
 
 // Ordre d affichage des enveloppes, et intitule long correspondant
-const ORDRE_ENVELOPPES = ["PEG","PEA","AV"];
+const ORDRE_ENVELOPPES = ["PEG","PEA","AV","LIV"];   // LIV = livrets (Livret A, LDDS...)
 
 // =======================================================
 //  CATALOGUE DES SUPPORTS (supports.txt)
@@ -314,7 +319,7 @@ function parserSupports(txt){
   const liste=[], erreurs=[];
   let courant=null;
   txt.split(/\r?\n/).forEach(function(l, i){
-    const t=l.replace(/^\uFEFF/,"").trim();
+    const t=l.replace(/^﻿/,"").trim();
     if(!t || t.charAt(0)==="#") return;
     const titre=t.match(/^\[(.+)\]$/);           // nouveau bloc
     if(titre){
@@ -378,6 +383,9 @@ async function chargerSupports(){
 
 // Raccourcis de lecture du catalogue, utilises partout dans la suite
 function estCote(cle){ const s=PAR_CLE[cle]; return !!s && s.source==="yahoo"; }
+// Support a valeur fixe (livret) : une "part" vaut toujours 1 EUR, la quantite
+// du journal est donc directement le solde en euros. Aucun cours a chercher.
+function estFixe(cle){ const s=PAR_CLE[cle]; return !!s && s.source==="fixe"; }
 function partActions(cle){ const s=PAR_CLE[cle]; return s? s.actions : 0; }
 function geoDe(cle){ const s=PAR_CLE[cle]; return s? s.geo : {monde:0,euro:0,em:0}; }
 function nomDe(cle){ const s=PAR_CLE[cle]; return s? s.nom : cle; }
@@ -400,7 +408,7 @@ function qtyOf(k){ return QUANTITES[k] || 0; }
 //     dans le PRU ; la PMV de cette ligne repart alors de sa 1re VL enregistree
 function nombreFr(s){
   if(s==null) return null;
-  s=String(s).trim().replace(/\s/g,"").replace(/\u00a0/g,"").replace(/€/g,"").replace(/EUR/gi,"");
+  s=String(s).trim().replace(/\s/g,"").replace(/ /g,"").replace(/€/g,"").replace(/EUR/gi,"");
   if(!s) return null;
   const v=parseFloat(s.replace(",","."));
   return isFinite(v)? v : null;
@@ -411,7 +419,7 @@ function parserApports(txt){
   const inconnus=[], malformes=[];
   const achats={};   // cle -> {qte, cout} : achats seuls, pour le PRU
   txt.split(/\r?\n/).forEach(function(l, i){
-    const brut=l.replace(/^\uFEFF/,"").trim();
+    const brut=l.replace(/^﻿/,"").trim();
     if(!brut || brut.charAt(0)==="#") return;
     const c=brut.split(";");
     const nom=(c[1]||"").trim();
@@ -517,6 +525,7 @@ function buildTotalSeries(data, hist, yres, costBasis){
   // Une passe sur le catalogue : chaque support fournit sa serie, cotee ou non
   SUPPORTS.forEach(function(sup){
     const cle=sup.cle, q=qtyOf(cle); if(!q) return;
+    if(estFixe(cle)) return;   // livrets : ajoutes plus bas, solde du journal a chaque date
     if(estCote(cle)){
       const y=yres[cle];
       if(y && y.q) series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });
@@ -539,6 +548,11 @@ function buildTotalSeries(data, hist, yres, costBasis){
   const dates=Object.keys(dset).sort();
   if(!dates.length) return null;
   const values=dates.map(function(){ return FONDS_EUROS; }); // fonds euros = constante a chaque date
+  // Livrets : solde tire du journal a chaque date (1 part = 1 EUR)
+  SUPPORTS.forEach(function(sup){
+    if(!estFixe(sup.cle)) return;
+    for(let i=0;i<dates.length;i++) values[i]+=qteA(sup.cle, dates[i]);
+  });
   series.forEach(function(s){
     const m={}; for(let i=0;i<s.dates.length;i++) m[s.dates[i]]=s.vals[i];
     // valeur reelle la plus recente <= startDate (toujours une donnee enregistree, jamais inventee)
@@ -908,10 +922,10 @@ function initSaisie(){
       const e=enveloppeDe(LIGNES[nom]);
       (groupes[e]||(groupes[e]=[])).push(nom);
     }
-    ["PEG","PEA","AV","Autres"].forEach(function(e){
+    ["PEG","PEA","AV","LIV","Autres"].forEach(function(e){
       if(!groupes[e]) return;
       const g=document.createElement("optgroup");
-      g.label = (e==="AV")? "Assurance vie" : e;
+      g.label = (e==="AV")? "Assurance vie" : (e==="LIV")? "Livrets" : e;
       groupes[e].forEach(function(nom){
         const o=document.createElement("option"); o.value=nom; o.textContent=nom; g.appendChild(o);
       });
@@ -927,7 +941,24 @@ function initSaisie(){
     const e=document.getElementById(id);
     if(e && !e.dataset.lie){ e.addEventListener("input", majMontant); e.dataset.lie="1"; }
   });
-  majJetonEtat(); majMontant();
+  if(sel && !sel.dataset.lie){ sel.addEventListener("change", majLibellesSaisie); sel.dataset.lie="1"; }
+  majLibellesSaisie(); majJetonEtat(); majMontant();
+}
+// Livret choisi : la quantite est un montant en euros et le prix vaut 1
+// (0 pour des interets, qui grossissent le solde sans compter comme un apport).
+function majLibellesSaisie(){
+  const sel=document.getElementById("fLigne"); if(!sel) return;
+  const fixe=estFixe(LIGNES[sel.value]);
+  const lq=document.getElementById("fQteLbl"), lp=document.getElementById("fPrixLbl");
+  const ip=document.getElementById("fPrix");
+  if(lq) lq.textContent = fixe? "Montant en euros" : "Quantite de parts";
+  if(lp) lp.textContent = fixe? "Valeur d un euro : 1 pour un versement, 0 pour des interets" : "Prix d une part en euros";
+  if(ip){
+    if(fixe && ip.value==="") ip.value="1";
+    if(!fixe && sel.dataset.etaitFixe==="1" && (ip.value==="1"||ip.value==="0")) ip.value="";
+  }
+  sel.dataset.etaitFixe = fixe? "1":"0";
+  majMontant();
 }
 // Rappel du montant : garde-fou contre une faute de frappe sur la quantite
 function majMontant(){
@@ -950,8 +981,8 @@ function nombreCsv(v){
 //   2. sinon a la fin de la section de son enveloppe
 //   3. sinon a la fin du fichier
 // Les en-tetes de section sont les commentaires "# --- PEG ...", "# --- PEA ...",
-// "# --- Assurance vie ..." de apports.csv : ne pas les renommer.
-const ENTETES_SECTION = { "PEG":/^#\s*-+\s*PEG\b/i, "PEA":/^#\s*-+\s*PEA\b/i, "AV":/^#\s*-+\s*Assurance\b/i };
+// "# --- Assurance vie ...", "# --- Livrets ..." de apports.csv : ne pas les renommer.
+const ENTETES_SECTION = { "PEG":/^#\s*-+\s*PEG\b/i, "PEA":/^#\s*-+\s*PEA\b/i, "AV":/^#\s*-+\s*Assurance\b/i, "LIV":/^#\s*-+\s*Livrets\b/i };
 function estEnteteSection(l){
   for(const e in ENTETES_SECTION){ if(ENTETES_SECTION[e].test(l)) return true; }
   return false;
@@ -1012,7 +1043,7 @@ async function enregistrerMouvement(){
   if(!nom || !LIGNES[nom]) return flash("fFlash","Choisis un support.",true);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return flash("fFlash","Date incomplete.",true);
   if(q===null || q===0) return flash("fFlash","Quantite absente ou nulle.",true);
-  if(p!==null && p<=0) return flash("fFlash","Le prix doit etre positif.",true);
+  if(p!==null && (p<0 || (p===0 && !estFixe(LIGNES[nom])))) return flash("fFlash","Le prix doit etre positif.",true);
   q=Math.abs(q)*SENS;
   const ligne=date+";"+nom+";"+nombreCsv(q)+";"+(p===null? "":nombreCsv(p));
   const mnt=(p===null)? "" : "  "+eur(Math.abs(q)*p);
@@ -1085,6 +1116,11 @@ async function loadAll(){
     data=await navR.json();
     try{ const hR=await fetch("history.json?t="+Date.now()); if(hR.ok) hist=await hR.json(); }catch(e){}
   }catch(e){}
+  // Livrets : pas de VL a recuperer, la part vaut 1 EUR. On les range dans data
+  // comme un fonds, ce qui les fait compter partout (totaux, PMV, allocation).
+  SUPPORTS.forEach(function(s){
+    if(s.source==="fixe") data[s.cle]={value:1, date:todayStr(), label:s.nom, status:"fixe"};
+  });
   // patrimoine.json : historique quotidien du patrimoine reel (ecrit par patrimoine.py)
   let patHist=[];
   try{
@@ -1103,8 +1139,8 @@ async function loadAll(){
   // Une seule boucle pour les trois sections : le catalogue donne l ordre des
   // supports et dit, pour chacun, s il faut lire le cours Yahoo ou la VL du fonds.
   // Ajouter une valeur dans supports.txt suffit donc a la voir apparaitre ici.
-  const BOITES = { "PEG":"peg", "PEA":"refs", "AV":"av" };
-  const totaux = { "PEG":0, "PEA":0, "AV":0 };
+  const BOITES = { "PEG":"peg", "PEA":"refs", "AV":"av", "LIV":"liv" };
+  const totaux = { "PEG":0, "PEA":0, "AV":0, "LIV":0 };
 
   ENVELOPPES.forEach(function(env){
     const boite=document.getElementById(BOITES[env.name]);
@@ -1112,6 +1148,14 @@ async function loadAll(){
     boite.innerHTML="";
     env.keys.forEach(function(cle){
       const row=document.createElement("div"); row.className="row";
+      if(estFixe(cle)){
+        // Livret : le solde est la somme des mouvements du journal, sans courbe
+        const solde=qtyOf(cle);
+        row.innerHTML='<div class="info"><div class="nm">'+nomDe(cle)+'</div><div class="sub"><span class="pr">solde</span><span class="held">'+eur(solde)+'</span></div></div><svg class="spark"></svg>';
+        totaux[env.name] += solde;
+        boite.appendChild(row);
+        return;
+      }
       if(estCote(cle)){
         // Valeur cotee : cours du jour et historique viennent de Yahoo
         const it=yres[cle];
@@ -1156,6 +1200,9 @@ async function loadAll(){
   document.getElementById("totAv").innerHTML=
     '<div class="tot av"><div class="lbl">Total assurance vie</div><div class="amount">'+eur(avTotal)+'</div>'
     +'<div class="ratio '+cls+'">Part UC : '+ratio.toFixed(1)+'%  (seuil bonus 30%)</div></div>';
+  const boiteLiv=document.getElementById("totLiv");
+  if(boiteLiv) boiteLiv.innerHTML = ENVELOPPES.some(function(e){ return e.name==="LIV"; })
+    ? '<div class="tot liv"><div class="lbl">Total livrets</div><div class="amount">'+eur(totaux["LIV"])+'</div></div>' : "";
 
   // --- Plus / moins-value (PRU), ancree au 16/06 : sert au cumul rouge, au detail et a la courbe ---
   function pmvCompute(){
@@ -1255,7 +1302,7 @@ async function loadAll(){
       +(realChartIdx>=0?'<span class="tap" onclick="event.stopPropagation();openFullChart('+realChartIdx+')">&#9654; patrimoine EUR</span>':'')+'</div>';
   }
 
-  // --- Synthese allocation actions / defensif (agregat des 3 enveloppes) ---
+  // --- Synthese allocation actions / defensif (agregat des enveloppes, livrets compris) ---
   (function(){
     function valFund(isin){ return (data[isin]&&data[isin].value!=null)? qtyOf(isin)*data[isin].value : 0; }
     function valYahoo(sym){ return (yres[sym]&&yres[sym].q)? qtyOf(sym)*yres[sym].q.price : 0; }
@@ -1298,7 +1345,7 @@ async function loadAll(){
       ? '<span class="sig-ok">Dans la bande (cible '+(TARGET_ACTIONS*100).toFixed(0)+'/'+((1-TARGET_ACTIONS)*100).toFixed(0)+', +/- '+(BANDE*100).toFixed(0)+' pts)</span>'
       : '<span class="sig-ko">Reequilibrage suggere : '+(drift>0?'alleger':'renforcer')+' les actions d environ '+eur(moveEur)+'</span>';
     document.getElementById("synth").innerHTML=
-      '<div class="synth"><div class="lbl">Patrimoine consolide (PEG + PEA + AV)</div>'
+      '<div class="synth"><div class="lbl">Patrimoine consolide (PEG + PEA + AV + livrets)</div>'
       +'<div class="big">'+eur(total)+'</div>'
       +progHtml
       +contribHtml
