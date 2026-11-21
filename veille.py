@@ -24,13 +24,15 @@ Ce qu il ecrit :
   rapports/signaux.csv              historique des signaux (une ligne par jour)
   rapports/candidats.json           candidats du jour, pour reperer les nouveaux
 
-Telegram : un message seulement s il y a au moins une alerte.
+Telegram : un message s il y a au moins une alerte ou une bonne affaire achetable
+(delai atteint), avec un petit tableau PER / dividende.
 Chaque bloc est protege : une source indisponible est signalee dans le rapport
 sans arreter le reste.
 """
 
 import csv
 import datetime
+import html
 import json
 import os
 import re
@@ -202,7 +204,9 @@ def cumul_versements_pea():
 def candidats(cib):
     """Valeurs saines en forte baisse, a partir de telemesure-zone-euro."""
     data = lire_json_url(URL_ZE + "data.json")
-    fiches = lire_json_url(URL_ZE + "analyse/fondamentaux.json").get("fiches", {})
+    fond = lire_json_url(URL_ZE + "analyse/fondamentaux.json")
+    fiches = fond.get("fiches", {})
+    date_fiches = (fond.get("generated") or "")[:10]
     out, sans_fiche = [], 0
     for a in data.get("series", []):
         if not a.get("mk") or a.get("src") != "yahoo":
@@ -238,9 +242,22 @@ def candidats(cib):
             if pts[i][1] / pts[i - 5][1] - 1 <= -0.10:
                 choc = pts[i][0]
         jours = (pts[-1][0] - choc).days
+        # Cours du jour : cours de la fiche (date de l analyse mensuelle) corrige de
+        # la variation de la courbe depuis (la courbe de data.json est en base 100).
+        prix = f.get("regularMarketPrice")
+        if prix and date_fiches:
+            avant = [y for d, y in pts if d.isoformat() <= date_fiches]
+            if avant and avant[-1]:
+                prix = prix * pts[-1][1] / avant[-1]
+        def ratio(num, den):
+            return num / den if (num and den and den > 0) else None
+        per = ratio(prix, f.get("trailingEps"))
+        per_att = ratio(prix, f.get("forwardEps"))
+        rdt = ratio(f.get("dividendRate"), prix) if f.get("dividendRate") else 0.0
         out.append(dict(tk=a["tk"], nom=a["name"], baisse=baisse, jours=jours, choc=choc.isoformat(),
                         delai_ok=jours >= cib["ba_delai_jours"],
-                        lev=lev, marge=marge, roe=roe, pf=a.get("pf")))
+                        lev=lev, marge=marge, roe=roe, pf=a.get("pf"),
+                        per=per, per_att=per_att, rdt=rdt))
     out.sort(key=lambda c: -c["baisse"])
     return out, sans_fiche
 
@@ -306,6 +323,23 @@ def eur(x):
     return ("{:,.0f} EUR".format(x)).replace(",", " ")
 
 
+def per_txt(x):
+    return "n.d." if x is None else ("%.1f" % x).replace(".", ",")
+
+
+def tableau_achetables(cand):
+    """Petit tableau a chasse fixe des candidates dont le delai est atteint."""
+    lignes = ["%-12s %6s %5s %5s %5s" % ("Valeur", "Baisse", "PER", "PERa", "Div")]
+    for c in cand:
+        if not c["delai_ok"]:
+            continue
+        lignes.append("%-12s %6s %5s %5s %5s" % (
+            c["nom"][:12], ("%.0f%%" % (-100 * c["baisse"])),
+            per_txt(c["per"])[:5], per_txt(c["per_att"])[:5],
+            ("n.d." if c["rdt"] is None else ("%.1f%%" % (100 * c["rdt"])).replace(".", ","))))
+    return lignes if len(lignes) > 1 else []
+
+
 def est_jour_versement(cib):
     """Le 5 du mois, ou le premier jour ouvre suivant si le 5 tombe un week-end."""
     j = int(cib["jour_versement"])
@@ -315,16 +349,28 @@ def est_jour_versement(cib):
     return AUJ == d
 
 
-def telegram(texte):
+def telegram(texte, html_mode=False):
+    """Envoi en morceaux de 3 800 caracteres. En mode HTML, le texte doit deja etre
+    echappe, et les morceaux sont coupes entre deux blocs (jamais dans un <pre>)."""
     tok, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if not tok or not chat:
         print("  Telegram : secrets absents, message non envoye")
         return
-    for i in range(0, len(texte), 3800):
-        morceau = texte[i:i + 3800]
+    blocs, courant = [], ""
+    for bloc in texte.split("\n\n"):
+        if courant and len(courant) + len(bloc) + 2 > 3800:
+            blocs.append(courant)
+            courant = ""
+        courant = (courant + "\n\n" + bloc) if courant else bloc
+    if courant:
+        blocs.append(courant)
+    for morceau in blocs:
+        donnees = {"chat_id": chat, "text": morceau[:4000]}
+        if html_mode:
+            donnees["parse_mode"] = "HTML"
         try:
             r = creq.post("https://api.telegram.org/bot%s/sendMessage" % tok,
-                          data={"chat_id": chat, "text": morceau}, timeout=20)
+                          data=donnees, timeout=20)
             print("  Telegram : HTTP %s" % r.status_code)
         except Exception as e:
             print("  Telegram KO : %s" % e)
@@ -518,9 +564,10 @@ def main():
     if cand:
         for c in cand[:15]:
             r.append("- %s (%s) : %s depuis le plus haut 6 mois ; dernier choc le %s (%d jours) ; "
-                     "%s, marge %s, rentabilite %s ; delai %s%s"
+                     "%s, marge %s, rentabilite %s ; PER %s, PER attendu %s, dividende %s ; delai %s%s"
                      % (c["nom"], c["tk"], pc(-c["baisse"], True), c["choc"], c["jours"],
                         levier_txt(c["lev"]), pc(c["marge"]), pc(c["roe"]),
+                        per_txt(c["per"]), per_txt(c["per_att"]), pc(c["rdt"]),
                         "atteint" if c["delai_ok"] else "non atteint",
                         " ; deja en portefeuille" if c["pf"] else ""))
     else:
@@ -546,13 +593,22 @@ def main():
             f.write(texte)
     print(texte)
 
-    if alertes:
-        msg = ["Veille du %s" % AUJ.strftime("%d/%m/%Y"), ""]
-        msg += ["- " + a for a in alertes]
-        msg += ["", "Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
-                % (pc(part_act), pc(1 - part_act), pc(cible),
-                   pc(-baisse_monde if baisse_monde is not None else None, True))]
-        telegram("\n".join(msg))
+    # Telegram : chaque jour s il y a une alerte ou au moins une candidate achetable.
+    tab = tableau_achetables(cand)
+    if alertes or tab:
+        e = html.escape
+        blocs = ["<b>Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
+        if alertes:
+            blocs.append("\n".join("- " + e(a) for a in alertes))
+        if tab:
+            blocs.append("<b>Bonnes affaires achetables</b> (delai d un mois atteint)\n<pre>"
+                         + e("\n".join(tab)) + "</pre>\n"
+                         "Baisse depuis le plus haut 6 mois. PER : cours / benefice des 12 derniers "
+                         "mois. PERa : cours / benefice attendu. Div : dividende annuel / cours.")
+        blocs.append(e("Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
+                       % (pc(part_act), pc(1 - part_act), pc(cible),
+                          pc(-baisse_monde if baisse_monde is not None else None, True))))
+        telegram("\n\n".join(blocs), html_mode=True)
 
 
 if __name__ == "__main__":
