@@ -207,6 +207,17 @@ actions   = 0.00
 # bien qu il soit loge en assurance vie.
 
 
+[Fonds euros]
+cle       = FONDS-EUROS
+enveloppe = AV
+source    = fixe
+actions   = 0.00
+# Fonds euros de l assurance vie BoursoVie. Gere comme un livret : 1 part = 1 EUR,
+# versements saisis dans apports.csv (montant ; 1), participation aux benefices
+# saisie au 31 decembre une fois creditee (montant ; 0). Pas de taux ici : le
+# rendement n est connu qu en fin d annee. Ne compte pas dans les unites de compte.
+
+
 # ================================== LIVRETS ==================================
 # Epargne reglementee, 100 % defensive. Pas de cours : le solde est la somme
 # des mouvements du journal (section "# --- Livrets" de apports.csv), plus les

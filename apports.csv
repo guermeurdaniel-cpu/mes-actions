@@ -47,9 +47,8 @@
 #  une fois credites par la banque, saisir : 31/12 ; montant ; 0. Ils entrent
 #  alors dans le solde sans compter comme un apport.
 #
-#  Le fonds euros de l assurance vie n est pas gere ici : il se saisit dans
-#  index.html, constantes FONDS_EUROS (valeur du jour) et FONDS_EUROS_VERSE
-#  (montant net verse).
+#  FONDS EUROS (assurance vie) : gere comme un livret. Versement : montant ; 1.
+#  Participation aux benefices, au 31 decembre une fois creditee : montant ; 0.
 #
 #  ATTENTION : les lignes datees du 2026-06-16 ci-dessous reprennent l ancien
 #  ancrage du tableau de bord. Leur prix est la valeur de la part au 16/06/2026,
@@ -82,6 +81,11 @@
 2026-10-19;GENFIT;120;8.42
 
 # --- Assurance vie -------------------------------------------------------
+2026-05-12;Fonds euros;6600;1
+2026-05-20;Fonds euros;11335;1
+# Ecart entre la valeur saisie jusqu ici (18 135) et les versements (17 935) :
+# a confirmer ; si la valeur reelle est 17 935, supprimer la ligne suivante.
+2026-06-16;Fonds euros;200;0
 2026-06-16;Amundi Euro Liquidity;0.3054;10885.40
 2026-06-16;Carmignac Securite;1.6917;1924.08
 2026-06-16;ETF Euro Corporate SRI;14.3676;226.55

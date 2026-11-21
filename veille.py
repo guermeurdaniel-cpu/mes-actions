@@ -176,7 +176,7 @@ def valoriser(series):
                         and not s["nom"].upper().startswith("ETF"))
         lignes.append(dict(nom=s["nom"], cle=cle, env=s["enveloppe"], valeur=v,
                            actions=s["actions"], geo=s["geo"], var_jour=var_jour,
-                           individuelle=individuelle))
+                           individuelle=individuelle, fixe=(s["source"] == "fixe")))
     return lignes, pat.lire_fonds_euros(), manquants, mvts
 
 
@@ -442,8 +442,9 @@ def main():
     if part_eu_tot > cib["europe"] + cib["europe_bande"]:
         alertes.append("Europe a %s de la poche actions, au-dessus de la cible %s : "
                        "reduire la part de PCEU dans les versements." % (pc(part_eu_tot), pc(cib["europe"])))
-    av_uc = sum(l["valeur"] for l in lignes if l["env"] == "AV")
-    uc_av = av_uc / (av_uc + fonds_euros) if (av_uc + fonds_euros) else 0
+    av_uc = sum(l["valeur"] for l in lignes if l["env"] == "AV" and not l["fixe"])
+    av_tot = sum(l["valeur"] for l in lignes if l["env"] == "AV") + fonds_euros
+    uc_av = av_uc / av_tot if av_tot else 0
     if uc_av < cib["uc_av_min"] or uc_av > cib["uc_av_max"] + 0.02:
         alertes.append("Assurance vie : unites de compte a %s (fourchette %s - %s)."
                        % (pc(uc_av), pc(cib["uc_av_min"]), pc(cib["uc_av_max"])))

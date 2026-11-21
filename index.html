@@ -279,8 +279,10 @@ const BRANCHE    = "main";
 const API_CONTENU= "https://api.github.com/repos/"+DEPOT+"/contents/apports.csv";
 
 // --- Assurance vie : le fonds euros n a pas de parts, il se saisit en montant ---
-const FONDS_EUROS       = 18135;   // valeur actuelle
-const FONDS_EUROS_VERSE = 18135;   // montant net verse (le gain est la difference)
+// Depuis le 21/11/2026 le fonds euros est un support du catalogue (source fixe,
+// cle FONDS-EUROS) saisi dans apports.csv. Ces deux constantes restent a 0.
+const FONDS_EUROS       = 0;
+const FONDS_EUROS_VERSE = 0;
 
 // Date de reference des courbes. Les apports anterieurs sont consideres en place
 // a cette date ; les apports posterieurs font monter le capital investi a leur date.
@@ -1249,6 +1251,7 @@ async function loadAll(){
   // Ajouter une valeur dans supports.txt suffit donc a la voir apparaitre ici.
   const BOITES = { "PEG":"peg", "PEA":"refs", "AV":"av", "LIV":"liv" };
   const totaux = { "PEG":0, "PEA":0, "AV":0, "LIV":0 };
+  let fondsEurosFixe=0;   // supports fixes de l assurance vie (fonds euros) : hors unites de compte
 
   ENVELOPPES.forEach(function(env){
     const boite=document.getElementById(BOITES[env.name]);
@@ -1266,6 +1269,7 @@ async function loadAll(){
           +'<span class="up">interets '+jour.slice(0,4)+' +'+eur(inter)+'</span>'
           +'</div></div><svg class="spark"></svg>';
         totaux[env.name] += solde+inter;
+        if(env.name==="AV") fondsEurosFixe += solde+inter;
         boite.appendChild(row);
         return;
       }
@@ -1295,19 +1299,11 @@ async function loadAll(){
     });
   });
 
-  // Le fonds euros n est pas un support : il se saisit en montant, en fin d assurance vie
-  const boiteAv=document.getElementById("av");
-  if(boiteAv){
-    const rowFE=document.createElement("div"); rowFE.className="row";
-    rowFE.innerHTML='<div class="info"><div class="nm">Fonds euros</div><div class="sub"><span class="pr">'+eur(FONDS_EUROS)+'</span><span class="held">'+eur(FONDS_EUROS)+'</span></div></div><svg class="spark"></svg>';
-    boiteAv.appendChild(rowFE);
-  }
-
-  pegTotal=totaux["PEG"]; peaTotal=totaux["PEA"]; avUC=totaux["AV"];
+  pegTotal=totaux["PEG"]; peaTotal=totaux["PEA"]; avUC=totaux["AV"]-fondsEurosFixe;
   document.getElementById("totPeg").innerHTML='<div class="tot peg"><div class="lbl">Total PEG</div><div class="amount">'+eur(pegTotal)+'</div></div>';
   document.getElementById("totPea").innerHTML='<div class="tot pea"><div class="lbl">Total PEA</div><div class="amount">'+eur(peaTotal)+'</div></div>';
 
-  const avTotal = avUC + FONDS_EUROS;
+  const avTotal = avUC + fondsEurosFixe + FONDS_EUROS;
   const ratio = avTotal>0 ? avUC/avTotal*100 : 0;
   const cls = ratio>=30 ? "ratio-ok" : "ratio-ko";
   document.getElementById("totAv").innerHTML=
@@ -1349,10 +1345,6 @@ async function loadAll(){
         totDay+=v; totCost+=c; eGain+=g;
         lines.push({label:lblOf(k), g:g});
       });
-      if(env.name==="AV"){                                   // fonds euros : gain = valeur - verse
-        const feGain=FONDS_EUROS-FONDS_EUROS_VERSE;
-        eGain+=feGain; lines.push({label:"Fonds euros", g:feGain});
-      }
       totGain+=eGain;
       if(lines.length) envs.push({name:env.name, g:eGain, lines:lines});
     });
