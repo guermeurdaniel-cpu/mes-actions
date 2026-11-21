@@ -52,10 +52,18 @@
 #                    1 pour une action ou un ETF actions, 0 pour un monetaire ou
 #                    un obligataire, une fraction pour un fonds mixte.
 #
-#      geo           Repartition de la POCHE ACTIONS par mandat d indice.
-#                    Trois destinations possibles : monde, euro, emergents.
-#                    Une seule    ->  geo = monde
-#                    Un melange   ->  geo = monde 0.50 + euro 0.50
+#      geo           Repartition geographique de la POCHE ACTIONS.
+#                    Trois destinations possibles :
+#                      monde      pays developpes HORS Europe (Etats-Unis,
+#                                 Japon, Canada, Australie...)
+#                      euro       Europe (zone euro, Royaume-Uni, Suisse,
+#                                 pays nordiques)
+#                      emergents  pays emergents
+#                    Une seule    ->  geo = euro
+#                    Un melange   ->  geo = monde 0.85 + euro 0.15
+#                    Un fonds MSCI World s ecrit monde 0.85 + euro 0.15 : la
+#                    part europeenne du MSCI World est d environ 15 % (fiche
+#                    MSCI du 30/10/2026). A revoir une fois par an.
 #                    Inutile de la renseigner si actions = 0.
 #
 #      taux          Livrets seulement : taux annuel en %, avec sa date d effet.
@@ -79,7 +87,7 @@ cle       = QS0009080175
 enveloppe = PEG
 source    = amundi-ee
 actions   = 1.00
-geo       = monde
+geo       = monde 0.85 + euro 0.15
 # Fonds Amundi actions monde, benchmark MSCI World. Contient la tranche PEG et
 # la tranche PER, qui partagent la meme valeur liquidative.
 
@@ -88,9 +96,11 @@ cle       = QS0009080746
 enveloppe = PEG
 source    = amundi-ee
 actions   = 0.50
-geo       = monde 0.50 + euro 0.50
+geo       = monde 0.425 + euro 0.575
 # Fonds mixte, bande de gestion 35-65% d actions ; on retient 50% en moyenne.
-# Sa poche actions est pour moitie mondiale, pour moitie zone euro.
+# Sa poche actions est pour moitie MSCI World (dont 15 % d Europe), pour
+# moitie zone euro (MSCI EMU) : 0,5 x 0,85 = 0,425 hors Europe, 0,5 x 0,15
+# + 0,5 = 0,575 Europe.
 
 [Label Monetaire ESR]
 cle       = QS0009080720
@@ -105,7 +115,7 @@ enveloppe = PEG
 source    = yahoo
 actions   = 1.00
 geo       = euro
-# Actionnariat salarie. Action du CAC 40, donc classee zone euro.
+# Actionnariat salarie. Action du CAC 40, donc classee Europe.
 
 
 # ==================================== PEA ====================================
@@ -115,8 +125,8 @@ cle       = WPEA.PA
 enveloppe = PEA
 source    = yahoo
 actions   = 1.00
-geo       = monde
-# Coeur du PEA.
+geo       = monde 0.85 + euro 0.15
+# Coeur du PEA. MSCI World : environ 15 % d Europe.
 
 [ETF Asie Emergente]
 cle       = PAASI.PA
@@ -133,15 +143,16 @@ source    = yahoo
 actions   = 1.00
 geo       = euro
 # ETF Amundi PEA MSCI Europe (FR0013412038), replication synthetique. Europe
-# large, Royaume-Uni et Suisse compris ; classee euro (Europe) par convention.
+# large, Royaume-Uni et Suisse compris ; classee Europe.
 
 [ASML]
 cle       = ASML.AS
 enveloppe = PEA
 source    = yahoo
 actions   = 1.00
-geo       = monde
-# ASML Holding (NL0010273215), Euronext Amsterdam. Classee monde developpe.
+geo       = euro
+# ASML Holding (NL0010273215), Euronext Amsterdam. Societe neerlandaise, donc
+# classee Europe.
 
 [Air Liquide]
 cle       = AI.PA
@@ -150,7 +161,7 @@ source    = yahoo
 actions   = 1.00
 geo       = euro
 # Air Liquide (FR0000120073), Euronext Paris. Action du CAC 40, donc classee
-# zone euro, comme Airbus.
+# Europe, comme Airbus.
 
 [GENFIT]
 cle       = GNFT.PA
@@ -159,7 +170,7 @@ source    = yahoo
 actions   = 1.00
 geo       = euro
 # GENFIT (FR0004163111), biotech lilloise cotee sur Euronext Paris. Societe
-# francaise, donc classee zone euro.
+# francaise, donc classee Europe.
 
 
 # ============================== ASSURANCE VIE ================================
