@@ -382,7 +382,15 @@ def main():
     # --- 3. Emergents, Europe, assurance vie, PEA
     em = sum(l["valeur"] * l["actions"] * l["geo"].get("em", 0) for l in lignes)
     part_em = em / actions if actions else 0
-    if abs(part_em - cib["emergents"]) > cib["emergents_bande"]:
+    # Alerte emergents seulement quand l ecart sort de la bande (la veille il y etait),
+    # et le jour du versement ; sinon l ecart figure dans le rapport et le resume.
+    hors_bande = abs(part_em - cib["emergents"]) > cib["emergents_bande"]
+    try:
+        em_veille = float(veille.get("part_em"))
+        hors_bande_veille = abs(em_veille - cib["emergents"]) > cib["emergents_bande"]
+    except (TypeError, ValueError):
+        hors_bande_veille = False
+    if hors_bande and (not hors_bande_veille or est_jour_versement(cib)):
         alertes.append("Emergents a %s de la poche actions (cible %s)." % (pc(part_em), pc(cib["emergents"])))
     eu = sum(l["valeur"] for l in lignes if l["cle"] == "PCEU.PA")
     part_eu = eu / actions if actions else 0
@@ -539,7 +547,9 @@ def main():
         msg += ["- " + a for a in alertes]
         msg += ["", "Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
                 % (pc(part_act), pc(1 - part_act), pc(cible),
-                   pc(-baisse_monde if baisse_monde is not None else None, True))]
+                   pc(-baisse_monde if baisse_monde is not None else None, True)),
+                "Poche actions : emergents %s (cible %s), Europe PCEU %s (cible %s)."
+                % (pc(part_em), pc(cib["emergents"]), pc(part_eu), pc(cib["europe"]))]
         telegram("\n".join(msg))
 
 
