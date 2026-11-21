@@ -28,9 +28,10 @@
 #      cle           Identifiant technique.
 #                    Valeur cotee   -> symbole Yahoo Finance (ex. AIR.PA, ASML.AS)
 #                    Fonds non cote -> code ISIN             (ex. QS0009080175)
+#                    Livret         -> nom court au choix    (ex. LIVRET-A)
 #
-#      enveloppe     PEG, PEA ou AV. Determine la section d affichage et le
-#                    regroupement des plus-values.
+#      enveloppe     PEG, PEA, AV ou LIV (livrets). Determine la section
+#                    d affichage et le regroupement des plus-values.
 #
 #      source        Ou trouver la valeur du jour :
 #                      yahoo       cotation en direct (actions et ETF)
@@ -38,6 +39,11 @@
 #                      amundi-fr   API Amundi grand public, pour les ISIN FR...
 #                      abcbourse   page produit abcbourse.com, url obligatoire
 #                      boursier    page produit boursier.com, url obligatoire
+#                      fixe        aucun cours : une part vaut toujours 1 EUR.
+#                                  Pour les livrets. Dans apports.csv, la
+#                                  quantite est alors le montant en euros
+#                                  (prix 1 pour un versement, 0 pour des
+#                                  interets, quantite negative pour un retrait).
 #
 #      url           Adresse de la page produit. Uniquement pour abcbourse
 #                    et boursier ; inutile pour les autres sources.
@@ -180,3 +186,21 @@ source    = yahoo
 actions   = 0.00
 # ETF obligataire d entreprises zone euro (LU1681039647). Cote, donc source yahoo,
 # bien qu il soit loge en assurance vie.
+
+
+# ================================== LIVRETS ==================================
+# Epargne reglementee, 100 % defensive. Pas de cours : le solde est la somme
+# des mouvements du journal (section "# --- Livrets" de apports.csv).
+
+[Livret A]
+cle       = LIVRET-A
+enveloppe = LIV
+source    = fixe
+actions   = 0.00
+
+[LDDS]
+cle       = LDDS
+enveloppe = LIV
+source    = fixe
+actions   = 0.00
+# Livret de developpement durable et solidaire.
