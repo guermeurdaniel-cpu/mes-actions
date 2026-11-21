@@ -1,0 +1,59 @@
+name: Envoi des notes sur Telegram
+
+# Chaque note ecrite par Claude dans notes/ (note quotidienne, revue mensuelle)
+# est envoyee sur Telegram des qu elle arrive dans le depot. Les notes de plus
+# de 3 800 caracteres partent en plusieurs messages.
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'notes/**.md' ]
+  workflow_dispatch:
+    inputs:
+      fichier:
+        description: "Note a renvoyer (ex. notes/2026-11-23.md)"
+        required: true
+
+jobs:
+  envoi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Envoi
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          AVANT: ${{ github.event.before }}
+          APRES: ${{ github.sha }}
+          MANUEL: ${{ github.event.inputs.fichier }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, urllib.parse, urllib.request
+          if os.environ.get("MANUEL"):
+              fichiers = [os.environ["MANUEL"]]
+          else:
+              avant = os.environ.get("AVANT") or ""
+              if not avant or set(avant) == {"0"}:
+                  avant = "HEAD~1"
+              sortie = subprocess.run(["git", "diff", "--name-only", "--diff-filter=AM",
+                                       avant, os.environ["APRES"], "--", "notes/"],
+                                      capture_output=True, text=True).stdout
+              fichiers = [f for f in sortie.split() if f.endswith(".md")]
+          tok, chat = os.environ["TELEGRAM_TOKEN"], os.environ["TELEGRAM_CHAT_ID"]
+          for f in sorted(fichiers):
+              texte = open(f, encoding="utf-8").read()
+              morceaux, courant = [], ""
+              for ligne in texte.splitlines(keepends=True):
+                  if len(courant) + len(ligne) > 3800:
+                      morceaux.append(courant); courant = ""
+                  courant += ligne
+              if courant.strip():
+                  morceaux.append(courant)
+              for m in morceaux:
+                  data = urllib.parse.urlencode({"chat_id": chat, "text": m}).encode()
+                  r = urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % tok, data=data, timeout=20)
+                  print(f, "->", r.status)
+          PY
