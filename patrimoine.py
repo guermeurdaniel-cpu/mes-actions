@@ -8,7 +8,8 @@ Sources :
   - apports.csv  : journal des apports, d ou sont deduites les quantites detenues
   - index.html   : uniquement le montant du fonds euros
   - nav.json   : dernieres VL des fonds (Amundi, Carmignac, ODDO)
-  - livrets (source fixe) : une part vaut 1 EUR, le solde vient du journal
+  - livrets (source fixe) : solde du journal plus interets courus de l annee,
+    calcules par quinzaine avec les taux de supports.txt (supports.valeur_livret)
   - Yahoo Finance (cote serveur, pas de CORS) : WPEA.PA, PAASI.PA, ASML.AS, CC4.PA
 
 Une entree par date ; si le script tourne plusieurs fois le meme jour,
@@ -27,6 +28,7 @@ import supports as supports_mod
 SUPPORTS = supports_mod.lire()
 YAHOO_SYMBOLS = supports_mod.cotes(SUPPORTS)
 FIXES = supports_mod.fixes(SUPPORTS)
+TAUX = dict((s["cle"], s["taux"]) for s in SUPPORTS)
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
 
 
@@ -74,6 +76,23 @@ def lire_apports(intitules, chemin="apports.csv"):
     return quantites
 
 
+def lire_mouvements(intitules, chemin="apports.csv"):
+    """Mouvements dates par cle : {cle: [(date, quantite), ...]}. Sert aux livrets,
+    dont la valeur depend des dates de versement (regle des quinzaines)."""
+    mvts = {}
+    with open(chemin, "r", encoding="utf-8-sig") as f:
+        for brut in f:
+            ligne = brut.strip()
+            if not ligne or ligne.startswith("#"):
+                continue
+            champs = ligne.split(";")
+            nom = champs[1].strip() if len(champs) > 1 else ""
+            qte = nombre_fr(champs[2]) if len(champs) > 2 else None
+            if nom in intitules and qte is not None:
+                mvts.setdefault(intitules[nom], []).append((champs[0].strip(), qte))
+    return mvts
+
+
 def prix_yahoo(sym):
     """Dernier cours Yahoo pour un symbole, ou None si echec."""
     try:
@@ -88,6 +107,8 @@ def prix_yahoo(sym):
 
 def main():
     quantites = lire_apports(supports_mod.par_intitule(SUPPORTS))
+    mouvements = lire_mouvements(supports_mod.par_intitule(SUPPORTS))
+    aujourdhui = datetime.date.today().isoformat()
     fonds_euros = lire_fonds_euros()
 
     with open("nav.json", "r", encoding="utf-8") as f:
@@ -100,8 +121,9 @@ def main():
         if isin in YAHOO_SYMBOLS:
             continue  # traite plus bas via Yahoo
         if isin in FIXES:
-            total += q  # livret : 1 part = 1 EUR
-            print("  %s : %s EUR (livret)" % (isin, q))
+            v = supports_mod.valeur_livret(TAUX[isin], mouvements.get(isin, []), aujourdhui)
+            total += v  # livret : solde + interets courus de l annee
+            print("  %s : %.2f EUR (livret, dont %.2f d interets courus)" % (isin, v, v - q))
             continue
         f_ = nav.get(isin)
         if f_ and f_.get("value") is not None:
@@ -130,7 +152,6 @@ def main():
     if manquants:
         print("ATTENTION lignes sans valeur (exclues du total) : %s" % ", ".join(manquants))
 
-    aujourdhui = datetime.date.today().isoformat()
     total = round(total, 2)
     print("Patrimoine total %s : %s EUR" % (aujourdhui, total))
 
