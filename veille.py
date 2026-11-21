@@ -383,7 +383,7 @@ def main():
     em = sum(l["valeur"] * l["actions"] * l["geo"].get("em", 0) for l in lignes)
     part_em = em / actions if actions else 0
     # Alerte emergents seulement quand l ecart sort de la bande (la veille il y etait),
-    # et le jour du versement ; sinon l ecart figure dans le rapport et le resume.
+    # et le jour du versement ; sinon l ecart figure dans le rapport.
     hors_bande = abs(part_em - cib["emergents"]) > cib["emergents_bande"]
     try:
         em_veille = float(veille.get("part_em"))
@@ -392,6 +392,8 @@ def main():
         hors_bande_veille = False
     if hors_bande and (not hors_bande_veille or est_jour_versement(cib)):
         alertes.append("Emergents a %s de la poche actions (cible %s)." % (pc(part_em), pc(cib["emergents"])))
+    eu_tot = sum(l["valeur"] * l["actions"] * l["geo"].get("euro", 0) for l in lignes)
+    part_eu_tot = eu_tot / actions if actions else 0
     eu = sum(l["valeur"] for l in lignes if l["cle"] == "PCEU.PA")
     part_eu = eu / actions if actions else 0
     if part_eu > cib["europe"] + cib["europe_bande"]:
@@ -500,7 +502,9 @@ def main():
                 (" (palier %d)" % palier) if palier else "", pts_txt(ecart)))
     r.append("- MSCI World (WPEA) : %s depuis son plus haut 1 an" % pc(-baisse_monde if baisse_monde is not None else None, True))
     r.append("- Emergents : %s de la poche actions (cible %s)" % (pc(part_em), pc(cib["emergents"])))
-    r.append("- Europe (PCEU) : %s de la poche actions (cible %s, atteinte par les versements)"
+    r.append("- Europe, toutes sources (MSCI World compris) : %s de la poche actions (%s)"
+             % (pc(part_eu_tot), eur(eu_tot)))
+    r.append("- dont ETF Europe (PCEU) : %s de la poche actions (cible %s, atteinte par les versements)"
              % (pc(part_eu), pc(cib["europe"])))
     r.append("- Assurance vie : unites de compte %s (fourchette %s - %s)"
              % (pc(uc_av), pc(cib["uc_av_min"]), pc(cib["uc_av_max"])))
@@ -547,9 +551,7 @@ def main():
         msg += ["- " + a for a in alertes]
         msg += ["", "Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
                 % (pc(part_act), pc(1 - part_act), pc(cible),
-                   pc(-baisse_monde if baisse_monde is not None else None, True)),
-                "Poche actions : emergents %s (cible %s), Europe PCEU %s (cible %s)."
-                % (pc(part_em), pc(cib["emergents"]), pc(part_eu), pc(cib["europe"]))]
+                   pc(-baisse_monde if baisse_monde is not None else None, True))]
         telegram("\n".join(msg))
 
 
