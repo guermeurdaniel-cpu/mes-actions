@@ -48,6 +48,8 @@ URL_ZE = "https://raw.githubusercontent.com/guermeurdaniel-cpu/telemesure-zone-e
 CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={rng}&interval=1d"
 URL_INFLATION = ("https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.4.ANR"
                  "?lastNObservations=1&format=jsondata")
+URL_INFLATION_EUROSTAT = ("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
+                          "prc_hicp_manr?format=JSON&geo=EA&coicop=CP00&lastTimePeriod=1")
 SYM_MONDE, SYM_EM, SYM_MP, SYM_CHANGE = "WPEA.PA", "PAASI.PA", "EXXY.DE", "EURUSD=X"
 PERSISTANCE = 20   # jours de bourse pour qu un signal de fond soit "confirme"
 
@@ -95,16 +97,35 @@ def lire_json_url(url):
 
 
 def inflation_zone_euro():
-    """(valeur en %, mois) de l IPCH zone euro en glissement annuel, ou (None, None)."""
+    """(valeur en %, mois) de l IPCH zone euro en glissement annuel, ou (None, None).
+    Deux sources (Eurostat, BCE) : on garde le mois le plus recent. Une donnee de
+    plus de 3 mois est jugee perimee et ecartee."""
+    trouves = []
+    try:
+        d = lire_json_url(URL_INFLATION_EUROSTAT)
+        idx = d["dimension"]["time"]["category"]["index"]
+        mois = max(idx, key=lambda k: idx[k])
+        v = d["value"].get(str(idx[mois]))
+        if v is not None:
+            trouves.append((mois, float(v), "Eurostat"))
+    except Exception as e:
+        print("  Inflation Eurostat KO : %s" % e)
     try:
         d = lire_json_url(URL_INFLATION)
         serie = list(d["dataSets"][0]["series"].values())[0]["observations"]
         cle = sorted(serie.keys(), key=int)[-1]
         mois = d["structure"]["dimensions"]["observation"][0]["values"][int(cle)]["id"]
-        return float(serie[cle][0]), mois
+        trouves.append((mois, float(serie[cle][0]), "BCE"))
     except Exception as e:
         print("  Inflation BCE KO : %s" % e)
+    if not trouves:
         return None, None
+    mois, v, src = max(trouves)
+    a, m = int(mois[:4]), int(mois[5:7])
+    if (AUJ.year - a) * 12 + AUJ.month - m > 3:
+        print("  Inflation perimee (%s, %s)" % (mois, src))
+        return None, "%s, perime" % mois
+    return v, "%s, %s" % (mois, src)
 
 
 def perf(pts, jours_bourse):
