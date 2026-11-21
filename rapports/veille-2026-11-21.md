@@ -4,14 +4,6 @@
 - Emergents a 7,0 % de la poche actions (cible 10,0 %).
 - ASML a bouge de -9,3 % aujourd hui : analyse a faire ce soir.
 - GENFIT a bouge de -9,5 % aujourd hui : analyse a faire ce soir.
-- Nouvelle candidate : Vallourec, -37,4 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 14,2 %). Delai d un mois apres le dernier choc : encore 30 jours.
-- Nouvelle candidate : ASML, -32,0 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 37,1 %). Delai d un mois apres le dernier choc : encore 30 jours.
-- Nouvelle candidate : Hermès, -30,5 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 42,2 %). Delai d un mois apres le dernier choc : atteint.
-- Nouvelle candidate : Equasens, -30,5 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 22,2 %). Delai d un mois apres le dernier choc : atteint.
-- Nouvelle candidate : Exosens, -27,7 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,9, marge 12,9 %). Delai d un mois apres le dernier choc : encore 15 jours.
-- Nouvelle candidate : Schneider Electric, -27,2 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,9, marge 18,2 %). Delai d un mois apres le dernier choc : atteint.
-- Nouvelle candidate : LVMH, -26,6 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,2, marge 22,5 %). Delai d un mois apres le dernier choc : atteint.
-- Nouvelle candidate : Pluxee, -26,5 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 27,5 %). Delai d un mois apres le dernier choc : encore 14 jours.
 
 ## Repartition
 - Patrimoine consolide : 260 446 EUR (AV 28 020 EUR, LIV 37 298 EUR, PEA 62 867 EUR, PEG 132 260 EUR)
@@ -39,7 +31,7 @@
 - 26 valeurs en forte baisse sans fondamentaux (relancer « Analyse historique » dans telemesure-zone-euro).
 
 ## Signaux de fond
-- Inflation zone euro : 1,9 % (2025-12)
+- Inflation zone euro : n.d. (2025-12, perime)
 - Matieres premieres (EXXY.DE) : 6 mois +0,9 %, 12 mois +28,8 % -> signal eteint (0 seances)
 - Emergents moins monde, 12 mois : -1,4 % -> signal neutre (0 seances)
 - Euro / dollar, 6 mois : -5,6 %
