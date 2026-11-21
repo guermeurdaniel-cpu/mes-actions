@@ -428,16 +428,12 @@ def main():
     # --- 3. Emergents, Europe, assurance vie, PEA
     em = sum(l["valeur"] * l["actions"] * l["geo"].get("em", 0) for l in lignes)
     part_em = em / actions if actions else 0
-    # Alerte emergents seulement quand l ecart sort de la bande (la veille il y etait),
-    # et le jour du versement ; sinon l ecart figure dans le rapport.
-    hors_bande = abs(part_em - cib["emergents"]) > cib["emergents_bande"]
-    try:
-        em_veille = float(veille.get("part_em"))
-        hors_bande_veille = abs(em_veille - cib["emergents"]) > cib["emergents_bande"]
-    except (TypeError, ValueError):
-        hors_bande_veille = False
-    if hors_bande and (not hors_bande_veille or est_jour_versement(cib)):
-        alertes.append("Emergents a %s de la poche actions (cible %s)." % (pc(part_em), pc(cib["emergents"])))
+    # Comme pour l Europe : un retard sur la cible se rattrape par les versements et
+    # figure dans le rapport ; alerte seulement si la cible est depassee de plus de
+    # la bande (il faut alors reduire PAASI dans les versements).
+    if part_em > cib["emergents"] + cib["emergents_bande"]:
+        alertes.append("Emergents a %s de la poche actions, au-dessus de la cible %s : "
+                       "reduire la part de PAASI dans les versements." % (pc(part_em), pc(cib["emergents"])))
     eu_tot = sum(l["valeur"] * l["actions"] * l["geo"].get("euro", 0) for l in lignes)
     part_eu_tot = eu_tot / actions if actions else 0
     eu = sum(l["valeur"] for l in lignes if l["cle"] == "PCEU.PA")

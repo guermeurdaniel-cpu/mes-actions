@@ -22,7 +22,7 @@ cible_palier_3   = 0.80
 
 # --- Poche actions
 emergents        = 0.10   # part de PAASI dans la poche actions (neutre ~ 10-11 %)
-emergents_bande  = 0.03   # alerte si l ecart depasse 3 points
+emergents_bande  = 0.03   # alerte seulement si les emergents depassent la cible de plus de 3 points
 europe           = 0.30   # Europe toutes sources (PCEU, part Europe du MSCI World,
                           # Label Equilibre, actions europeennes), en part de la poche
                           # actions ; atteinte par les versements sur PCEU

@@ -48,7 +48,8 @@ Mesurés sur l'ETF MSCI World du PEA (WPEA) depuis son plus haut sur un an :
 
 - **Émergents : 10 % de la poche actions**, via PAASI (Asie émergente
   seulement). C'est la position neutre : les émergents pèsent environ 11 % du
-  marché mondial (MSCI ACWI). Alerte si l'écart dépasse 3 points.
+  marché mondial (MSCI ACWI). Un retard se rattrape par les versements, sans
+  alerte ; alerte seulement si la part dépasse la cible de plus de 3 points.
 - **Europe : 30 % de la poche actions, toutes sources confondues** : part
   européenne du MSCI World (environ 15 %, dans Actions Internationales ESR et
   WPEA), Label Équilibre, actions européennes (Airbus, ASML, Air Liquide,
