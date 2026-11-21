@@ -49,14 +49,15 @@ Mesurés sur l'ETF MSCI World du PEA (WPEA) depuis son plus haut sur un an :
 - **Émergents : 10 % de la poche actions**, via PAASI (Asie émergente
   seulement). C'est la position neutre : les émergents pèsent environ 11 % du
   marché mondial (MSCI ACWI). Alerte si l'écart dépasse 3 points.
-- **Europe : 10 % de la poche actions**, via PCEU (MSCI Europe). Le MSCI
-  World est très concentré sur les États-Unis (environ 73 %) et la technologie,
-  et mes dépenses futures sont en euros. Avec PCEU, l'exposition totale à
-  l'Europe (PCEU, part européenne du MSCI World, Label Équilibre, actions
-  individuelles) monte vers un tiers de la poche actions. Décidé le 21/11/2026,
-  à partir de zéro : la cible est atteinte par les versements en 5 à 6 ans,
-  plus vite si l'Europe recule ou en cas de palier de forte baisse. Pas
-  d'alerte tant que PCEU est sous la cible ; alerte s'il la dépasse de plus de
+- **Europe : 30 % de la poche actions, toutes sources confondues** : part
+  européenne du MSCI World (environ 15 %, dans Actions Internationales ESR et
+  WPEA), Label Équilibre, actions européennes (Airbus, ASML, Air Liquide,
+  Genfit...) et PCEU (MSCI Europe). Le MSCI World est très concentré sur les
+  États-Unis (environ 73 %) et la technologie, et mes dépenses futures sont en
+  euros. Point de départ le 21/11/2026 : 22,9 %. Décidé le 21/11/2026 : la
+  cible est atteinte par les versements sur PCEU en 5 ans environ, plus vite
+  si l'Europe recule ou en cas de palier de forte baisse. Pas d'alerte tant
+  que l'Europe est sous la cible ; alerte si elle la dépasse de plus de
   3 points.
 - **Matières premières (CMSE)** : **0 %** aujourd'hui. Entrée possible par
   paliers de 5 points de la poche actions, décidée en revue mensuelle, si les
@@ -75,8 +76,9 @@ Répartition par défaut à partir du 5 décembre 2026 (validée le 21/11/2026) 
 
 - PAASI à 160 € tant que les émergents sont sous 10 % de la poche actions ;
   ensuite 80 €, les 80 € libérés allant à WPEA.
-- PCEU à 200 € tant que PCEU est sous 10 % de la poche actions ; ensuite
-  environ 65 €, le reste allant à WPEA.
+- PCEU à 200 € tant que l'Europe, toutes sources, est sous 30 % de la poche
+  actions ; ensuite le montant qui la maintient à 30 % (environ 100 €), le
+  reste allant à WPEA.
 - Si la répartition s'écarte de la cible, la revue mensuelle oriente tout ou
   partie du versement vers le côté en retard.
 - La poche « bonnes affaires » est alimentée seulement au moment d'un achat
