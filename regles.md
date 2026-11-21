@@ -66,24 +66,39 @@ Mesurés sur l'ETF MSCI World du PEA (WPEA) depuis son plus haut sur un an :
 
 ## 4. Versement mensuel (le 5)
 
-Répartition par défaut à partir du 5 décembre 2026 (validée le 21/11/2026) :
+Le versement remplit des **réservoirs** sur un horizon de **5 ans** (60
+versements, de décembre 2026 à fin 2031), avec une modulation mensuelle selon
+l'actualité. Décidé le 21/11/2026.
 
-| Support | Montant |
-|---|---|
-| WPEA (MSCI World) | 290 € |
-| PCEU (MSCI Europe) | 200 € |
-| PAASI (Asie émergente) | 160 € |
-| Défensif (assurance vie : fonds euros, en gardant 32 à 35 % de monétaire) | 350 € |
+**Défensif : 350 €**, uniquement dans l'assurance vie, répartis entre le fonds
+euros et Amundi Euro Liquidity de façon à garder les unités de compte entre
+32 et 35 % du contrat (bonus du fonds euros à partir de 30 %). Ce montant ne
+change que si la répartition 65/35 sort de sa bande ou si un palier de forte
+baisse est déclenché (§2).
 
-- PAASI à 160 € tant que les émergents sont sous 10 % de la poche actions ;
-  ensuite 80 €, les 80 € libérés allant à WPEA.
-- PCEU à 200 € tant que l'Europe, toutes sources, est sous 30 % de la poche
-  actions ; ensuite le montant qui la maintient à 30 % (environ 100 €), le
-  reste allant à WPEA.
-- Si la répartition s'écarte de la cible, la revue mensuelle oriente tout ou
-  partie du versement vers le côté en retard.
-- La poche « bonnes affaires » est alimentée seulement au moment d'un achat
-  validé, à partir de la part actions du versement.
+**Actions : 650 €**, entre trois réservoirs et les bonnes affaires.
+
+1. **Base de chaque réservoir** : le montant mensuel qui, répété jusqu'à fin
+   2031, amène l'Europe à 30 % et les émergents à 10 % d'une poche actions
+   qui grossit de 650 € par mois (effet de marché ignoré). La part européenne
+   des achats de WPEA (15 %) et les achats d'actions européennes comptent pour
+   l'Europe. WPEA reçoit le reste. Recalculée à chaque revue sur les montants
+   réels : un mois où un réservoir reçoit plus réduit sa base des mois
+   suivants, et inversement. Bases au 21/11/2026 : PCEU 370 €, PAASI 150 €,
+   WPEA 130 €.
+2. **Modulation** : chaque mois, chaque réservoir reçoit **entre 0 et 3 fois
+   sa base**, dans la limite des 650 €, selon la baisse depuis le plus haut,
+   la valorisation et l'actualité. Exemple : l'Europe perd 15 % pendant que le
+   monde est stable, PCEU peut recevoir jusqu'à 650 € ce mois-là.
+3. **Bonnes affaires** : au plus un achat par mois, entre 500 et 1 000 €, pris
+   sur la part actions du mois, seulement si l'analyse conclut à une vraie
+   occasion (§5) et dans les plafonds.
+4. **Mémoire et contrôle** : chaque revue est consignée dans
+   suivi/plan-versements.md (écarts, bases, décision, justification, et ce
+   qu'aurait donné la base sans modulation), puis comparée aux achats réels de
+   apports.csv. À 12 puis 24 mois, la performance des décisions modulées est
+   comparée à celle des bases seules ; si la modulation ne fait pas mieux, on
+   revient aux bases.
 
 ## 5. Poche « bonnes affaires » (actions individuelles)
 

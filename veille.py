@@ -53,6 +53,7 @@ URL_INFLATION = ("https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.
 URL_INFLATION_EUROSTAT = ("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
                           "prc_hicp_manr?format=JSON&geo=EA&coicop=CP00&lastTimePeriod=1")
 SYM_MONDE, SYM_EM, SYM_MP, SYM_CHANGE = "WPEA.PA", "PAASI.PA", "EXXY.DE", "EURUSD=X"
+SYM_EU = "PCEU.PA"
 PERSISTANCE = 20   # jours de bourse pour qu un signal de fond soit "confirme"
 
 
@@ -388,7 +389,7 @@ def main():
 
     # --- Series de reference
     series = {}
-    for sym in (SYM_MONDE, SYM_EM, SYM_MP, SYM_CHANGE):
+    for sym in (SYM_MONDE, SYM_EM, SYM_MP, SYM_CHANGE, SYM_EU):
         series[sym] = serie_yahoo(sym, "1y")
 
     # --- 1. Repartition
@@ -543,6 +544,15 @@ def main():
              % (pc(part_act), pc(1 - part_act), pc(cible),
                 (" (palier %d)" % palier) if palier else "", pts_txt(ecart)))
     r.append("- MSCI World (WPEA) : %s depuis son plus haut 1 an" % pc(-baisse_monde if baisse_monde is not None else None, True))
+    def depuis_haut(pts):
+        return (pts[-1][1] / max(v for _, v in pts) - 1) if pts else None
+    def sur_un_an(pts):
+        return perf(pts, 250) if pts else None
+    r.append("- Les trois ETF du versement, ecart au plus haut 1 an / performance 1 an : "
+             "MSCI World (WPEA) %s / %s ; MSCI Europe (PCEU) %s / %s ; Asie emergente (PAASI) %s / %s"
+             % (pc(depuis_haut(series[SYM_MONDE]), True), pc(sur_un_an(series[SYM_MONDE]), True),
+                pc(depuis_haut(series[SYM_EU]), True), pc(sur_un_an(series[SYM_EU]), True),
+                pc(depuis_haut(series[SYM_EM]), True), pc(sur_un_an(series[SYM_EM]), True)))
     r.append("- Emergents : %s de la poche actions (cible %s)" % (pc(part_em), pc(cib["emergents"])))
     r.append("- Europe, toutes sources (MSCI World compris) : %s de la poche actions, %s "
              "(cible %s, atteinte par les versements sur PCEU)"

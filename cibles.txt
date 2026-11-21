@@ -52,8 +52,12 @@ ligne_mouvement_jour = 0.08
 # --- Versement mensuel
 jour_versement   = 5
 montant_versement = 1000
-# Repartition par defaut du versement (regles.md §4), en euros
-versement_wpea     = 290
-versement_pceu     = 200  # tant que l Europe est sous sa cible
-versement_paasi    = 160  # tant que les emergents sont sous leur cible ; ensuite 80
-versement_defensif = 350
+# Reservoirs (regles.md §4) : cibles Europe et emergents a atteindre en
+# horizon_mois versements a partir de decembre 2026 (soit fin 2031)
+horizon_mois       = 60
+modulation_max     = 3    # chaque reservoir recoit entre 0 et 3 fois sa base
+# Bases du versement, calculees le 21/11/2026 (recalculees a chaque revue), en euros
+versement_wpea     = 130
+versement_pceu     = 370
+versement_paasi    = 150
+versement_defensif = 350  # assurance vie : fonds euros + Euro Liquidity, UC entre 32 et 35 %
