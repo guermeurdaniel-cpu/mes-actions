@@ -638,7 +638,10 @@ function buildTotalSeries(data, hist, yres, costBasis){
   const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
   // Une passe sur le catalogue : chaque support fournit sa serie, cotee ou non
   SUPPORTS.forEach(function(sup){
-    const cle=sup.cle, q=qtyOf(cle); if(!q) return;
+    const cle=sup.cle, q=qtyOf(cle);
+    // Une ligne vendue (quantite nulle aujourd hui) reste dans l historique : qteA()
+    // lui donne sa quantite a chaque date, donc sa valeur jusqu a la vente.
+    if(!q && !APPORTS.some(function(a){ return a.cle===cle; })) return;
     if(estFixe(cle)) return;   // livrets : ajoutes plus bas, solde du journal a chaque date
     if(estCote(cle)){
       const y=yres[cle];
