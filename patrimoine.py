@@ -8,6 +8,7 @@ Sources :
   - apports.csv  : journal des apports, d ou sont deduites les quantites detenues
   - index.html   : uniquement le montant du fonds euros
   - nav.json   : dernieres VL des fonds (Amundi, Carmignac, ODDO)
+  - livrets (source fixe) : une part vaut 1 EUR, le solde vient du journal
   - Yahoo Finance (cote serveur, pas de CORS) : WPEA.PA, PAASI.PA, ASML.AS, CC4.PA
 
 Une entree par date ; si le script tourne plusieurs fois le meme jour,
@@ -25,6 +26,7 @@ import supports as supports_mod
 # Les valeurs cotees viennent du catalogue : rien a tenir a jour ici.
 SUPPORTS = supports_mod.lire()
 YAHOO_SYMBOLS = supports_mod.cotes(SUPPORTS)
+FIXES = supports_mod.fixes(SUPPORTS)
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
 
 
@@ -40,7 +42,7 @@ def lire_fonds_euros(chemin="index.html"):
 
 def nombre_fr(txt):
     """Convertit '39,07' ou '39.07' en float. Chaine vide -> None."""
-    t = (txt or "").strip().replace("\u00a0", "").replace(" ", "").replace("EUR", "").replace("\u20ac", "")
+    t = (txt or "").strip().replace(" ", "").replace(" ", "").replace("EUR", "").replace("€", "")
     if not t:
         return None
     return float(t.replace(",", "."))
@@ -97,6 +99,10 @@ def main():
     for isin, q in quantites.items():
         if isin in YAHOO_SYMBOLS:
             continue  # traite plus bas via Yahoo
+        if isin in FIXES:
+            total += q  # livret : 1 part = 1 EUR
+            print("  %s : %s EUR (livret)" % (isin, q))
+            continue
         f_ = nav.get(isin)
         if f_ and f_.get("value") is not None:
             total += q * float(f_["value"])
