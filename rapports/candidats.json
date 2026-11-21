@@ -1,0 +1,34 @@
+{
+ "VK.PA": {
+  "nom": "Vallourec",
+  "delai_ok": false
+ },
+ "ASML.AS": {
+  "nom": "ASML",
+  "delai_ok": false
+ },
+ "RMS.PA": {
+  "nom": "Hermès",
+  "delai_ok": true
+ },
+ "EQS.PA": {
+  "nom": "Equasens",
+  "delai_ok": true
+ },
+ "EXENS.PA": {
+  "nom": "Exosens",
+  "delai_ok": false
+ },
+ "SU.PA": {
+  "nom": "Schneider Electric",
+  "delai_ok": true
+ },
+ "MC.PA": {
+  "nom": "LVMH",
+  "delai_ok": true
+ },
+ "PLX.PA": {
+  "nom": "Pluxee",
+  "delai_ok": false
+ }
+}
