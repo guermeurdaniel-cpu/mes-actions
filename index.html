@@ -1257,6 +1257,20 @@ async function loadAll(){
     const pR=await fetch("patrimoine.json?t="+Date.now());
     if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
   }catch(e){}
+  // realises.csv : plus et moins-values des ventes, genere par realises.py a chaque
+  // modification du journal. null si absent (calcul de secours plus bas).
+  let realisesTot=null;
+  try{
+    const rR=await fetch("realises.csv?t="+Date.now(), {cache:"no-store"});
+    if(rR.ok){
+      let t=0;
+      (await rR.text()).split(/\r?\n/).forEach(function(l){
+        l=l.trim(); if(!l || l.charAt(0)==="#" || l.indexOf("date;")===0) return;
+        const c=l.split(";"); const v=parseFloat(c[6]); if(!isNaN(v)) t+=v;
+      });
+      realisesTot=t;
+    }
+  }catch(e){}
 
   // Echelle base 100 commune a toutes les courbes
   let gmin=Infinity, gmax=-Infinity;
@@ -1428,16 +1442,18 @@ async function loadAll(){
       +'<span class="since">PMV vs apports</span>'
       +(totalChartIdx>=0?'<span class="tap">&#9654; courbe %</span>':'')
       +(realChartIdx>=0?'<span class="tap" onclick="event.stopPropagation();openFullChart('+realChartIdx+')">&#9654; patrimoine EUR</span>':'')+'</div>';
-    // Gains ou pertes depuis juin 2026 : patrimoine - apports nets (versements moins
-    // retraits, ventes comprises), rapportes au patrimoine du jour.
-    const apportsNets=investiA(todayStr());
-    if(apportsNets>0){
-      const gJ=pmv.totDay-apportsNets, pJ=gJ/pmv.totDay*100, sgJ=gJ>=0?"+":"";
-      progHtml+=
-        '<div class="meta">Depuis juin 2026 : <span class="'+(gJ>=0?"prog-up":"prog-down")+'">'
-        +sgJ+eur(gJ)+', soit '+sgJ+pJ.toFixed(2)+'% du patrimoine</span>'
-        +' (ventes et arbitrages compris)</div>';
-    }
+    // Gains et pertes depuis juin 2026 : en cours (lignes detenues, PMV ci-dessus)
+    // + realises (ventes, realises.csv) = total, rapporte au patrimoine du jour.
+    // Secours si realises.csv manque : total = patrimoine - apports nets.
+    const enCours=pmv.totGain;
+    const realise=(realisesTot!==null)? realisesTot : (pmv.totDay-investiA(todayStr()))-enCours;
+    const totJ=enCours+realise, pJ=totJ/pmv.totDay*100;
+    function sgn(x){ return x>=0? "+" : ""; }
+    function cls(x){ return x>=0? "prog-up" : "prog-down"; }
+    progHtml+=
+      '<div class="meta">Depuis juin 2026 : en cours <span class="'+cls(enCours)+'">'+sgn(enCours)+eur(enCours)+'</span>'
+      +' + realises <span class="'+cls(realise)+'">'+sgn(realise)+eur(realise)+'</span>'
+      +' = <span class="'+cls(totJ)+'">'+sgn(totJ)+eur(totJ)+', soit '+sgn(totJ)+pJ.toFixed(2)+'% du patrimoine</span></div>';
   }
 
   // --- Synthese allocation actions / defensif (agregat des enveloppes, livrets compris) ---
