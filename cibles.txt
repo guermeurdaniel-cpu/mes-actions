@@ -23,8 +23,10 @@ cible_palier_3   = 0.80
 # --- Poche actions
 emergents        = 0.10   # part de PAASI dans la poche actions (neutre ~ 10-11 %)
 emergents_bande  = 0.03   # alerte si l ecart depasse 3 points
-europe           = 0.10   # part de PCEU dans la poche actions, atteinte par les versements
-europe_bande     = 0.03   # alerte seulement si PCEU depasse la cible de plus de 3 points
+europe           = 0.30   # Europe toutes sources (PCEU, part Europe du MSCI World,
+                          # Label Equilibre, actions europeennes), en part de la poche
+                          # actions ; atteinte par les versements sur PCEU
+europe_bande     = 0.03   # alerte seulement si l Europe depasse la cible de plus de 3 points
 matieres_premieres = 0.00 # CMSE : 0 % tant que les signaux ne sont pas confirmes
 poche_bonnes_affaires_max = 0.10  # actions individuelles, en part de la poche actions
 ligne_individuelle_max    = 0.05  # une seule action, en part du patrimoine total
@@ -52,6 +54,6 @@ jour_versement   = 5
 montant_versement = 1000
 # Repartition par defaut du versement (regles.md §4), en euros
 versement_wpea     = 290
-versement_pceu     = 200  # tant que PCEU est sous sa cible
+versement_pceu     = 200  # tant que l Europe est sous sa cible
 versement_paasi    = 160  # tant que les emergents sont sous leur cible ; ensuite 80
 versement_defensif = 350
