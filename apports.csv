@@ -42,8 +42,10 @@
 #
 #  LIVRETS (source = fixe dans supports.txt) : une part vaut 1 EUR, la quantite
 #  est donc un montant en euros. Versement : montant ; 1. Retrait : montant
-#  negatif ; 1. Interets annuels : montant ; 0 (ils grossissent le solde sans
-#  compter comme un apport, et apparaissent comme gain).
+#  negatif ; 1. Les interets de l annee en cours sont calcules tout seuls (taux
+#  de supports.txt, regle des quinzaines) et comptes comme gain. Au 31 decembre,
+#  une fois credites par la banque, saisir : 31/12 ; montant ; 0. Ils entrent
+#  alors dans le solde sans compter comme un apport.
 #
 #  Le fonds euros de l assurance vie n est pas gere ici : il se saisit dans
 #  index.html, constantes FONDS_EUROS (valeur du jour) et FONDS_EUROS_VERSE
@@ -86,6 +88,6 @@
 2026-06-16;ODDO Global Target 2029;0.2715;110.29
 
 # --- Livrets -------------------------------------------------------------
-# Soldes constates le 21/11/2026, saisis comme un versement unique.
-2026-11-21;Livret A;24542;1
-2026-11-21;LDDS;12246;1
+# Soldes au 1er janvier 2026 : les interets 2026 sont calcules a partir de la.
+2026-01-01;Livret A;24542;1
+2026-01-01;LDDS;12246;1
