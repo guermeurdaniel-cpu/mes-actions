@@ -396,9 +396,9 @@ def main():
     part_eu_tot = eu_tot / actions if actions else 0
     eu = sum(l["valeur"] for l in lignes if l["cle"] == "PCEU.PA")
     part_eu = eu / actions if actions else 0
-    if part_eu > cib["europe"] + cib["europe_bande"]:
-        alertes.append("Europe (PCEU) a %s de la poche actions, au-dessus de la cible %s : "
-                       "reduire sa part des versements." % (pc(part_eu), pc(cib["europe"])))
+    if part_eu_tot > cib["europe"] + cib["europe_bande"]:
+        alertes.append("Europe a %s de la poche actions, au-dessus de la cible %s : "
+                       "reduire la part de PCEU dans les versements." % (pc(part_eu_tot), pc(cib["europe"])))
     av_uc = sum(l["valeur"] for l in lignes if l["env"] == "AV")
     uc_av = av_uc / (av_uc + fonds_euros) if (av_uc + fonds_euros) else 0
     if uc_av < cib["uc_av_min"] or uc_av > cib["uc_av_max"] + 0.02:
@@ -502,10 +502,10 @@ def main():
                 (" (palier %d)" % palier) if palier else "", pts_txt(ecart)))
     r.append("- MSCI World (WPEA) : %s depuis son plus haut 1 an" % pc(-baisse_monde if baisse_monde is not None else None, True))
     r.append("- Emergents : %s de la poche actions (cible %s)" % (pc(part_em), pc(cib["emergents"])))
-    r.append("- Europe, toutes sources (MSCI World compris) : %s de la poche actions (%s)"
-             % (pc(part_eu_tot), eur(eu_tot)))
-    r.append("- dont ETF Europe (PCEU) : %s de la poche actions (cible %s, atteinte par les versements)"
-             % (pc(part_eu), pc(cib["europe"])))
+    r.append("- Europe, toutes sources (MSCI World compris) : %s de la poche actions, %s "
+             "(cible %s, atteinte par les versements sur PCEU)"
+             % (pc(part_eu_tot), eur(eu_tot), pc(cib["europe"])))
+    r.append("- dont ETF Europe (PCEU) : %s de la poche actions (%s)" % (pc(part_eu), eur(eu)))
     r.append("- Assurance vie : unites de compte %s (fourchette %s - %s)"
              % (pc(uc_av), pc(cib["uc_av_min"]), pc(cib["uc_av_max"])))
     r.append("- PEA : environ %s verses sur %s (approximatif : ancrages du 16/06/2026)"
