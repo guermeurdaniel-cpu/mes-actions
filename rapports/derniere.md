@@ -4,6 +4,14 @@
 - Emergents a 7,0 % de la poche actions (cible 10,0 %).
 - ASML a bouge de -9,3 % aujourd hui : analyse a faire ce soir.
 - GENFIT a bouge de -9,5 % aujourd hui : analyse a faire ce soir.
+- Nouvelle candidate : BE Semiconductor, -55,4 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 40,5 %). Delai d un mois apres le dernier choc : encore 15 jours.
+- Nouvelle candidate : Rheinmetall, -46,4 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,2, marge 16,9 %). Delai d un mois apres le dernier choc : encore 27 jours.
+- Nouvelle candidate : ASM International, -40,7 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 31,2 %). Delai d un mois apres le dernier choc : encore 16 jours.
+- Nouvelle candidate : Melexis, -37,5 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,0, marge 16,9 %). Delai d un mois apres le dernier choc : atteint.
+- Nouvelle candidate : Siemens Energy, -34,7 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 11,5 %). Delai d un mois apres le dernier choc : encore 15 jours.
+- Nouvelle candidate : Neste, -31,1 % depuis son plus haut 6 mois, saine (dette/EBITDA 0,7, marge 14,1 %). Delai d un mois apres le dernier choc : encore 30 jours.
+- Nouvelle candidate : Moncler, -29,4 % depuis son plus haut 6 mois, saine (dette/EBITDA 0,1, marge 29,0 %). Delai d un mois apres le dernier choc : encore 30 jours.
+- Nouvelle candidate : Wavestone, -29,4 % depuis son plus haut 6 mois, saine (tresorerie nette, marge 12,5 %). Delai d un mois apres le dernier choc : atteint.
 
 ## Repartition
 - Patrimoine consolide : 260 446 EUR (AV 28 020 EUR, LIV 37 298 EUR, PEA 62 867 EUR, PEG 132 260 EUR)
@@ -19,16 +27,22 @@
 - Air Liquide (PEA) : 2 251 EUR, 0,9 % du patrimoine, jour -0,8 %
 - GENFIT (PEA) : 1 145 EUR, 0,4 % du patrimoine, jour -9,5 %
 
-## Bonnes affaires candidates (8)
-- Vallourec (VK.PA) : -37,4 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; tresorerie nette, marge 14,2 %, rentabilite 15,8 % ; delai non atteint
-- ASML (ASML.AS) : -32,0 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; tresorerie nette, marge 37,1 %, rentabilite 53,9 % ; delai non atteint ; deja en portefeuille
-- Hermès (RMS.PA) : -30,5 % depuis le plus haut 6 mois ; dernier choc le 2026-07-29 (114 jours) ; tresorerie nette, marge 42,2 %, rentabilite 25,5 % ; delai atteint
-- Equasens (EQS.PA) : -30,5 % depuis le plus haut 6 mois ; dernier choc le 2026-10-05 (46 jours) ; tresorerie nette, marge 22,2 %, rentabilite 16,3 % ; delai atteint
-- Exosens (EXENS.PA) : -27,7 % depuis le plus haut 6 mois ; dernier choc le 2026-11-05 (15 jours) ; dette/EBITDA 1,9, marge 12,9 %, rentabilite 12,7 % ; delai non atteint
-- Schneider Electric (SU.PA) : -27,2 % depuis le plus haut 6 mois ; dernier choc le 2026-10-09 (42 jours) ; dette/EBITDA 1,9, marge 18,2 %, rentabilite 18,6 % ; delai atteint
-- LVMH (MC.PA) : -26,6 % depuis le plus haut 6 mois ; dernier choc le 2026-06-16 (157 jours) ; dette/EBITDA 1,2, marge 22,5 %, rentabilite 16,6 % ; delai atteint
-- Pluxee (PLX.PA) : -26,5 % depuis le plus haut 6 mois ; dernier choc le 2026-11-04 (16 jours) ; tresorerie nette, marge 27,5 %, rentabilite 50,7 % ; delai non atteint
-- 26 valeurs en forte baisse sans fondamentaux (relancer « Analyse historique » dans telemesure-zone-euro).
+## Bonnes affaires candidates (16)
+- BE Semiconductor (BESI.AS) : -55,4 % depuis le plus haut 6 mois ; dernier choc le 2026-11-05 (15 jours) ; tresorerie nette, marge 40,5 %, rentabilite 56,8 % ; delai non atteint
+- Rheinmetall (RHM.DE) : -46,4 % depuis le plus haut 6 mois ; dernier choc le 2026-11-17 (3 jours) ; dette/EBITDA 1,2, marge 16,9 %, rentabilite 26,7 % ; delai non atteint
+- ASM International (ASM.AS) : -40,7 % depuis le plus haut 6 mois ; dernier choc le 2026-11-06 (14 jours) ; tresorerie nette, marge 31,2 %, rentabilite 23,5 % ; delai non atteint
+- Melexis (MELE.BR) : -37,5 % depuis le plus haut 6 mois ; dernier choc le 2026-10-15 (36 jours) ; dette/EBITDA 1,0, marge 16,9 %, rentabilite 21,6 % ; delai atteint
+- Vallourec (VK.PA) : -37,4 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; dette/EBITDA 0,2, marge 14,8 %, rentabilite 12,7 % ; delai non atteint
+- Siemens Energy (ENR.DE) : -34,7 % depuis le plus haut 6 mois ; dernier choc le 2026-11-05 (15 jours) ; tresorerie nette, marge 11,5 %, rentabilite 36,9 % ; delai non atteint
+- ASML (ASML.AS) : -32,0 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; tresorerie nette, marge 38,6 %, rentabilite 65,6 % ; delai non atteint ; deja en portefeuille
+- Neste (NESTE.HE) : -31,1 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; dette/EBITDA 0,7, marge 14,1 %, rentabilite 29,3 % ; delai non atteint
+- Hermès (RMS.PA) : -30,5 % depuis le plus haut 6 mois ; dernier choc le 2026-07-29 (114 jours) ; tresorerie nette, marge 41,8 %, rentabilite 25,5 % ; delai atteint
+- Equasens (EQS.PA) : -30,5 % depuis le plus haut 6 mois ; dernier choc le 2026-10-05 (46 jours) ; dette/EBITDA 0,0, marge 20,5 %, rentabilite 17,2 % ; delai atteint
+- Moncler (MONC.MI) : -29,4 % depuis le plus haut 6 mois ; dernier choc le 2026-11-20 (0 jours) ; dette/EBITDA 0,1, marge 29,0 %, rentabilite 18,1 % ; delai non atteint
+- Wavestone (WAVE.PA) : -29,4 % depuis le plus haut 6 mois ; dernier choc le 2026-09-10 (71 jours) ; tresorerie nette, marge 12,5 %, rentabilite 12,3 % ; delai atteint
+- Exosens (EXENS.PA) : -27,7 % depuis le plus haut 6 mois ; dernier choc le 2026-11-05 (15 jours) ; dette/EBITDA 1,9, marge 17,4 %, rentabilite 12,7 % ; delai non atteint
+- Schneider Electric (SU.PA) : -27,2 % depuis le plus haut 6 mois ; dernier choc le 2026-10-09 (42 jours) ; dette/EBITDA 1,9, marge 17,9 %, rentabilite 18,6 % ; delai atteint
+- LVMH (MC.PA) : -26,6 % depuis le plus haut 6 mois ; dernier choc le 2026-06-16 (157 jours) ; dette/EBITDA 1,2, marge 21,8 %, rentabilite 16,6 % ; delai atteint
 
 ## Signaux de fond
 - Inflation zone euro : n.d. (2025-12, perime)

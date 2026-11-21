@@ -1,10 +1,34 @@
 {
+ "BESI.AS": {
+  "nom": "BE Semiconductor",
+  "delai_ok": false
+ },
+ "RHM.DE": {
+  "nom": "Rheinmetall",
+  "delai_ok": false
+ },
+ "ASM.AS": {
+  "nom": "ASM International",
+  "delai_ok": false
+ },
+ "MELE.BR": {
+  "nom": "Melexis",
+  "delai_ok": true
+ },
  "VK.PA": {
   "nom": "Vallourec",
   "delai_ok": false
  },
+ "ENR.DE": {
+  "nom": "Siemens Energy",
+  "delai_ok": false
+ },
  "ASML.AS": {
   "nom": "ASML",
+  "delai_ok": false
+ },
+ "NESTE.HE": {
+  "nom": "Neste",
   "delai_ok": false
  },
  "RMS.PA": {
@@ -13,6 +37,14 @@
  },
  "EQS.PA": {
   "nom": "Equasens",
+  "delai_ok": true
+ },
+ "MONC.MI": {
+  "nom": "Moncler",
+  "delai_ok": false
+ },
+ "WAVE.PA": {
+  "nom": "Wavestone",
   "delai_ok": true
  },
  "EXENS.PA": {
