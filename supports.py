@@ -10,8 +10,8 @@ Format lu (voir l en-tete de supports.txt pour la documentation complete) :
 
     [Intitule du support]
     cle       = QS0009080175      ISIN, ou symbole Yahoo si la valeur est cotee
-    enveloppe = PEG               PEG, PEA ou AV
-    source    = amundi-ee         yahoo, amundi-ee, amundi-fr, abcbourse, boursier
+    enveloppe = PEG               PEG, PEA, AV ou LIV (livrets)
+    source    = amundi-ee         yahoo, amundi-ee, amundi-fr, abcbourse, boursier, fixe
     url       = https://...       uniquement pour abcbourse et boursier
     actions   = 1.00              part investie en actions, entre 0 et 1
     geo       = monde 0.50 + euro 0.50
@@ -22,8 +22,8 @@ Les lignes vides et celles commencant par # sont ignorees.
 import re
 
 FICHIER = "supports.txt"
-ENVELOPPES_VALIDES = ("PEG", "PEA", "AV")
-SOURCES_VALIDES = ("yahoo", "amundi-ee", "amundi-fr", "abcbourse", "boursier")
+ENVELOPPES_VALIDES = ("PEG", "PEA", "AV", "LIV")
+SOURCES_VALIDES = ("yahoo", "amundi-ee", "amundi-fr", "abcbourse", "boursier", "fixe")
 
 
 def _nombre(txt):
@@ -125,8 +125,14 @@ def cotes(supports):
 
 
 def fonds(supports):
-    """Supports dont la valeur doit etre recuperee par le scraper (non cotes)."""
-    return [s for s in supports if s["source"] != "yahoo"]
+    """Supports dont la valeur doit etre recuperee par le scraper (non cotes).
+    Les livrets (source fixe) n ont pas de valeur a recuperer : exclus."""
+    return [s for s in supports if s["source"] not in ("yahoo", "fixe")]
+
+
+def fixes(supports):
+    """Cles des supports a valeur fixe (livrets) : une part vaut 1 EUR."""
+    return [s["cle"] for s in supports if s["source"] == "fixe"]
 
 
 def par_intitule(supports):
