@@ -624,8 +624,16 @@ function lineCost(k){ return (PRU[k]!=null) ? qtyOf(k)*PRU[k] : null; }
 const PALETTE=["#0a84ff","#30d158","#bf5af2","#ff9f0a","#ff453a","#5e5ce6","#64d2ff","#ffd60a","#ff6482","#32d74b","#5ac8fa","#c0a0ff"];
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
+// Cout de revient d une ligne a une date : quantite detenue x prix de revient
+// (PRU) a cette date. null si aucun prix d achat connu.
+function coutA(cle, date){
+  const p=pruA(cle, date);
+  return (p!=null)? qteA(cle, date)*p : null;
+}
 // Construit la serie temporelle du patrimoine consolide (somme qte*VL + fonds euros),
 // limitee a la fenetre reellement enregistree (report de la derniere VL connue, jamais de reconstruction du passe).
+// Renvoie aussi, a chaque date, le cout de revient des lignes detenues (costs) :
+// gains cumules = values - costs, meme definition que la PMV du haut de la page.
 function buildTotalSeries(data, hist, yres, costBasis){
   const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
   // Une passe sur le catalogue : chaque support fournit sa serie, cotee ou non
@@ -634,11 +642,11 @@ function buildTotalSeries(data, hist, yres, costBasis){
     if(estFixe(cle)) return;   // livrets : ajoutes plus bas, solde du journal a chaque date
     if(estCote(cle)){
       const y=yres[cle];
-      if(y && y.q) series.push({ dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });
+      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });
     } else {
       const h=hist[cle]||[], f=data[cle];
-      if(h.length) series.push({ dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
-      else if(f && f.value!=null) series.push({ dates:[todayStr()], vals:[q*f.value] });
+      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
+      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[q*f.value] });
     }
   });
   if(!series.length) return null;
@@ -654,10 +662,14 @@ function buildTotalSeries(data, hist, yres, costBasis){
   const dates=Object.keys(dset).sort();
   if(!dates.length) return null;
   const values=dates.map(function(){ return FONDS_EUROS; }); // fonds euros = constante a chaque date
-  // Livrets : solde du journal + interets courus, a chaque date
+  const costs=dates.map(function(){ return FONDS_EUROS_VERSE; });
+  // Livrets et fonds euros : solde du journal + interets courus, a chaque date
   SUPPORTS.forEach(function(sup){
     if(!estFixe(sup.cle)) return;
-    for(let i=0;i<dates.length;i++) values[i]+=valeurLivret(sup.cle, dates[i]);
+    for(let i=0;i<dates.length;i++){
+      const v=valeurLivret(sup.cle, dates[i]), c=coutA(sup.cle, dates[i]);
+      values[i]+=v; costs[i]+=(c!=null? c : v);
+    }
   });
   series.forEach(function(s){
     const m={}; for(let i=0;i<s.dates.length;i++) m[s.dates[i]]=s.vals[i];
@@ -667,7 +679,11 @@ function buildTotalSeries(data, hist, yres, costBasis){
     for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
     for(let i=0;i<dates.length;i++){
       if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte la derniere VL connue
-      if(last!=null) values[i]+=last;
+      if(last!=null){
+        values[i]+=last;
+        const c=coutA(s.cle, dates[i]);
+        costs[i]+=(c!=null? c : last);   // sans prix d achat connu : gain compte nul
+      }
     }
   });
   // Ancre au 16/06 : on prefixe la serie par le cout de revient total (capital investi) a REF_DATE,
@@ -675,8 +691,9 @@ function buildTotalSeries(data, hist, yres, costBasis){
   if(costBasis!=null && isFinite(costBasis) && costBasis>0 && (!dates.length || dates[0]>REF_DATE)){
     dates.unshift(REF_DATE);
     values.unshift(costBasis);
+    costs.unshift(costBasis);
   }
-  return { dates:dates, values:values };
+  return { dates:dates, values:values, costs:costs };
 }
 
 function toBase100(values){
@@ -1376,12 +1393,14 @@ async function loadAll(){
   const totalSeries=buildTotalSeries(data,hist,yres,investiA(REF_DATE));
   if(totalSeries && totalSeries.values.length>=2 && pmv.totCost>0){
     const td=totalSeries.dates;
-    // % rapporte au capital reellement investi A CETTE DATE : un apport fait en
-    // cours de route ne se lit donc pas comme une performance
-    const pct=totalSeries.values.map(function(v,i){ const c=investiA(td[i]); return c>0? (v/c-1)*100 : 0; });
+    // A chaque date : gains cumules de toutes les lignes (valeur - cout de revient des
+    // parts detenues) rapportes au patrimoine de cette date. Meme definition que le
+    // chiffre du haut : le dernier point de la courbe lui correspond. Un apport ne se
+    // lit pas comme une performance (il entre a son cout de revient).
+    const pct=totalSeries.values.map(function(v,i){ const c=totalSeries.costs[i]; return v>0? (v-c)/v*100 : 0; });
     totalChartIdx=allCharts.length;
     // compareValues : serie EUR conservee pour le comparateur base 100 (une serie en % ne peut pas etre re-basee a 100)
-    allCharts.push({label:"Patrimoine total (PMV en %)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
+    allCharts.push({label:"Patrimoine total (gains cumules en % du patrimoine)", dates:td, values:pct, up:(pct[pct.length-1]>=0), unit:"%", isTotal:true, compareValues:totalSeries.values});
   }
   // Patrimoine reel : valeur absolue quotidienne (bourse + apports), historisee par patrimoine.py
   if(patHist.length>=2){
