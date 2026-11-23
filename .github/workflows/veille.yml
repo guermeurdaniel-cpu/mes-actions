@@ -5,10 +5,17 @@ name: Veille quotidienne
 # cloture d Euronext. Ecrit rapports/ et envoie un message Telegram seulement
 # s il y a une alerte. Aussi a la main (Run workflow) et a chaque modification
 # du script ou des cibles.
+#
+# Les lancements planifies de GitHub ne sont pas garantis (retards, oublis) :
+# deux lancements de secours suivent, a 17:15 et 18:15 UTC. Ils ne font rien
+# si le rapport du jour (rapports/veille-AAAA-MM-JJ.md) existe deja, pour
+# eviter les doublons sur Telegram. Ajoute le 23/11/2026.
 
 on:
   schedule:
-    - cron: "45 16 * * 1-5"
+    - cron: "45 16 * * 1-5"   # 17:45 Paris l hiver
+    - cron: "15 17 * * 1-5"   # secours, 18:15 Paris l hiver
+    - cron: "15 18 * * 1-5"   # secours, 19:15 Paris l hiver
   workflow_dispatch:
   push:
     branches: [ main ]
@@ -27,20 +34,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Deja fait aujourd hui ?
+        id: deja
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ -f "rapports/veille-$(date -u +%Y-%m-%d).md" ]; then
+            echo "Rapport du jour deja present : rien a faire."
+            echo "fait=oui" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-python@v5
+        if: steps.deja.outputs.fait != 'oui'
         with:
           python-version: "3.12"
 
       - name: Dependances
+        if: steps.deja.outputs.fait != 'oui'
         run: pip install curl-cffi
 
       - name: Veille
+        if: steps.deja.outputs.fait != 'oui'
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python veille.py
 
       - name: Commit du rapport
+        if: steps.deja.outputs.fait != 'oui'
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@users.noreply.github.com"
