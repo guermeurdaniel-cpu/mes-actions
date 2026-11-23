@@ -32,8 +32,13 @@ poche_bonnes_affaires_max = 0.10  # actions individuelles, en part de la poche a
 ligne_individuelle_max    = 0.05  # une seule action, en part du patrimoine total
 
 # --- Assurance vie
-uc_av_min        = 0.32   # part minimale d unites de compte (bonus fonds euros : 30 %)
-uc_av_max        = 0.35
+uc_av_min        = 0.32   # bas de la zone de pilotage : en dessous, les versements
+                          # mettent plus de 30 % en unites de compte
+uc_av_max        = 0.35   # haut de la zone de pilotage : au-dessus, versements au
+                          # minimum de 30 % d UC, sans arbitrage
+uc_av_versement_min = 0.30 # part minimale d UC dans chaque versement (condition du
+                          # boost BoursoVie, avec plus de 30 % d UC au 31 decembre)
+uc_av_alerte_decembre = 0.31 # alerte en decembre si la part d UC passe sous ce seuil
 
 # --- PEA
 plafond_pea      = 150000
@@ -60,4 +65,5 @@ modulation_max     = 3    # chaque reservoir recoit entre 0 et 3 fois sa base
 versement_wpea     = 130
 versement_pceu     = 370
 versement_paasi    = 150
-versement_defensif = 350  # assurance vie : fonds euros + Euro Liquidity, UC entre 32 et 35 %
+versement_defensif = 350  # assurance vie : au moins 30 % d UC (Euro Liquidity) par
+                          # versement, le reste en fonds euros (regles.md §4 et §8)
