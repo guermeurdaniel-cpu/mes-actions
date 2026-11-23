@@ -7,6 +7,10 @@
   "nom": "Rheinmetall",
   "delai_ok": false
  },
+ "VK.PA": {
+  "nom": "Vallourec",
+  "delai_ok": false
+ },
  "ASM.AS": {
   "nom": "ASM International",
   "delai_ok": false
@@ -15,52 +19,44 @@
   "nom": "Melexis",
   "delai_ok": true
  },
- "VK.PA": {
-  "nom": "Vallourec",
+ "NESTE.HE": {
+  "nom": "Neste",
   "delai_ok": false
  },
  "ENR.DE": {
   "nom": "Siemens Energy",
   "delai_ok": false
  },
- "ASML.AS": {
-  "nom": "ASML",
-  "delai_ok": false
- },
- "NESTE.HE": {
-  "nom": "Neste",
-  "delai_ok": false
+ "EQS.PA": {
+  "nom": "Equasens",
+  "delai_ok": true
  },
  "RMS.PA": {
   "nom": "Hermès",
   "delai_ok": true
  },
- "EQS.PA": {
-  "nom": "Equasens",
+ "WAVE.PA": {
+  "nom": "Wavestone",
   "delai_ok": true
  },
  "MONC.MI": {
   "nom": "Moncler",
   "delai_ok": false
  },
- "WAVE.PA": {
-  "nom": "Wavestone",
-  "delai_ok": true
- },
  "EXENS.PA": {
   "nom": "Exosens",
   "delai_ok": false
  },
- "SU.PA": {
-  "nom": "Schneider Electric",
-  "delai_ok": true
+ "PLX.PA": {
+  "nom": "Pluxee",
+  "delai_ok": false
+ },
+ "ASML.AS": {
+  "nom": "ASML",
+  "delai_ok": false
  },
  "MC.PA": {
   "nom": "LVMH",
   "delai_ok": true
- },
- "PLX.PA": {
-  "nom": "Pluxee",
-  "delai_ok": false
  }
 }
