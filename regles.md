@@ -1,6 +1,7 @@
 # Règles de la stratégie de placement
 
-Version du 21 novembre 2026. Document de référence commun au script quotidien
+Version du 21 novembre 2026, modifiée le 23 novembre 2026 (§2, §4, §8 :
+contraintes du boost BoursoVie). Document de référence commun au script quotidien
 (veille.py) et aux analyses de Claude. Il ne se modifie qu'une fois par an, ou
 lors d'une revue mensuelle quand une règle ci-dessous l'autorise. Les valeurs
 chiffrées sont dans **cibles.txt** : c'est ce fichier que lisent la page « Mes
@@ -38,7 +39,10 @@ Mesurés sur l'ETF MSCI World du PEA (WPEA) depuis son plus haut sur un an :
   mensuelle : c'est la seule exception à la règle de décision à froid.
 - Ordre de mobilisation du défensif :
   1. monétaire de l'assurance vie (Amundi Euro Liquidity) vers des unités de
-     compte actions, sans frais ni impôt ;
+     compte actions, sans frais ni impôt. Montant limité : après une baisse
+     supplémentaire de 25 % des actions, la part d'unités de compte du
+     contrat doit rester au-dessus de 30 % (condition du boost, §8) ; sinon,
+     transférer moins ;
   2. monétaire du PEG (Label Monétaire ESR) vers Actions Internationales ESR ;
   3. livrets vers le PEA, dans la limite du plafond de versement.
 - Retour à 65/35 : progressif, par les versements mensuels, une fois le MSCI
@@ -70,9 +74,12 @@ Le versement remplit des **réservoirs** sur un horizon de **5 ans** (60
 versements, de décembre 2026 à fin 2031), avec une modulation mensuelle selon
 l'actualité. Décidé le 21/11/2026.
 
-**Défensif : 350 €**, uniquement dans l'assurance vie, répartis entre le fonds
-euros et Amundi Euro Liquidity de façon à garder les unités de compte entre
-32 et 35 % du contrat (bonus du fonds euros à partir de 30 %). Ce montant ne
+**Défensif : 350 €**, uniquement dans l'assurance vie. Pour bénéficier du
+boost du fonds euros (§8), chaque versement contient **au moins 30 %
+d'unités de compte** (Amundi Euro Liquidity), soit 105 € au moins ; le reste
+va au fonds euros. Si la part d'unités de compte du contrat est sous 32 %,
+la part d'unités de compte du versement monte jusqu'à 100 % pour revenir
+dans la zone 32-35 %. Ce montant ne
 change que si la répartition 65/35 sort de sa bande ou si un palier de forte
 baisse est déclenché (§2).
 
@@ -154,12 +161,31 @@ déclenche une analyse de la ligne par Claude le soir même.
 
 ## 8. Assurance vie
 
-- Poche unités de compte : **monétaire uniquement** (Amundi Euro Liquidity),
-  entre **32 et 35 %** du contrat pour garder le bonus du fonds euros (seuil 30 %).
-- Décision du 21/11/2026 : arbitrer Carmignac Sécurité, l'ETF Euro Corporate SRI
-  et le reliquat ODDO 2029 vers Amundi Euro Liquidity (à faire après
-  vérification de la règle exacte du bonus chez BoursoVie).
-- Le monétaire est la première réserve mobilisée par les paliers de forte baisse.
+- **Boost du fonds euros** : prime d'intérêts versée fin janvier avec les
+  intérêts du fonds euros. Deux conditions : chaque versement contient
+  **au moins 30 % d'unités de compte**, et la part d'unités de compte du
+  contrat **dépasse 30 % au 31 décembre**. Les deux sont toujours respectées,
+  sauf décision contraire notée dans le journal (notes/).
+- Poche unités de compte : **monétaire uniquement** (Amundi Euro Liquidity).
+- Zone de pilotage : **32 à 35 %** d'unités de compte.
+  - Au-dessus de 35 % : pas d'arbitrage ; les versements se font au minimum
+    de 30 % d'unités de compte.
+  - Sous 32 % : la part d'unités de compte des versements augmente (jusqu'à
+    100 %) pour revenir dans la zone.
+- **Revue du 5 février** : saisir dans apports.csv les intérêts du fonds euros
+  et le boost crédités fin janvier (prix 0), puis recalculer la part d'unités
+  de compte.
+- **Revue du 5 décembre** : calculer la part d'unités de compte prévue au
+  31 décembre, en supposant une baisse de 10 % des unités de compte actions.
+  Sous 31 % : arbitrage du fonds euros vers Amundi Euro Liquidity avant le
+  20 décembre.
+- En décembre, la note quotidienne alerte si la part d'unités de compte passe
+  sous 31 %.
+- Arbitrage du 21/11/2026 de Carmignac Sécurité, de l'ETF Euro Corporate SRI et
+  du reliquat ODDO 2029 vers Amundi Euro Liquidity : en cours ; les montants
+  estimés de apports.csv seront remplacés par ceux de l'avis d'opéré.
+- Le monétaire est la première réserve mobilisée par les paliers de forte baisse
+  (avec la limite du §2).
 
 ## 9. Enveloppes
 
