@@ -1,24 +1,25 @@
-# Veille du 23/11/2026
+# Veille du 24/11/2026
 
 ## Alertes
-- ASML a bouge de +8,9 % aujourd hui : analyse a faire ce soir.
+- ASML a bouge de -9,3 % aujourd hui : analyse a faire ce soir.
+- GENFIT a bouge de -9,5 % aujourd hui : analyse a faire ce soir.
 
 ## Repartition
-- Patrimoine consolide : 261 333 EUR (AV 28 022 EUR, LIV 37 298 EUR, PEA 65 705 EUR, PEG 130 307 EUR)
-- Actions 64,7 % / defensif 35,3 % ; cible 65,0 % ; ecart -0,3 points
-- MSCI World (WPEA) : -4,1 % depuis son plus haut 1 an
-- Les trois ETF du versement, ecart au plus haut 1 an / performance 1 an : MSCI World (WPEA) -4,1 % / +15,7 % ; MSCI Europe (PCEU) -4,0 % / +13,5 % ; Asie emergente (PAASI) -16,8 % / +20,6 %
-- Emergents : 7,5 % de la poche actions (cible 10,0 %)
-- Europe, toutes sources (MSCI World compris) : 23,0 % de la poche actions, 38 857 EUR (cible 30,0 %, atteinte par les versements sur PCEU)
+- Patrimoine consolide : 258 368 EUR (AV 28 022 EUR, LIV 37 298 EUR, PEA 62 867 EUR, PEG 130 180 EUR)
+- Actions 64,3 % / defensif 35,7 % ; cible 65,0 % ; ecart -0,7 points
+- MSCI World (WPEA) : -7,2 % depuis son plus haut 1 an
+- Les trois ETF du versement, ecart au plus haut 1 an / performance 1 an : MSCI World (WPEA) -7,2 % / +12,0 % ; MSCI Europe (PCEU) -5,8 % / +11,5 % ; Asie emergente (PAASI) -23,4 % / +10,7 %
+- Emergents : 7,0 % de la poche actions (cible 10,0 %)
+- Europe, toutes sources (MSCI World compris) : 23,0 % de la poche actions, 38 146 EUR (cible 30,0 %, atteinte par les versements sur PCEU)
 - dont ETF Europe (PCEU) : 0,0 % de la poche actions (0 EUR)
 - Assurance vie : unites de compte 35,3 % (fourchette 32,0 % - 35,0 %)
 - PEA : environ 66 602 EUR verses sur 150 000 EUR (approximatif : ancrages du 16/06/2026)
 
-## Lignes individuelles (6,8 % de la poche actions)
-- Airbus (PEG) : 4 310 EUR, 1,6 % du patrimoine, jour +3,0 %
-- ASML (PEA) : 3 817 EUR, 1,5 % du patrimoine, jour +8,9 %
-- Air Liquide (PEA) : 2 252 EUR, 0,9 % du patrimoine, jour +0,0 %
-- GENFIT (PEA) : 1 196 EUR, 0,5 % du patrimoine, jour +4,5 %
+## Lignes individuelles (6,7 % de la poche actions)
+- Airbus (PEG) : 4 184 EUR, 1,6 % du patrimoine, jour -4,1 %
+- ASML (PEA) : 3 504 EUR, 1,4 % du patrimoine, jour -9,3 %
+- Air Liquide (PEA) : 2 251 EUR, 0,9 % du patrimoine, jour -0,8 %
+- GENFIT (PEA) : 1 145 EUR, 0,4 % du patrimoine, jour -9,5 %
 
 ## Bonnes affaires candidates (15)
 - BE Semiconductor (BESI.AS) : -51,3 % depuis le plus haut 6 mois ; dernier choc le 2026-11-05 (18 jours) ; tresorerie nette, marge 40,5 %, rentabilite 56,8 % ; PER 42,9, PER attendu 23,9, dividende 1,0 % ; delai non atteint
@@ -39,6 +40,6 @@
 
 ## Signaux de fond
 - Inflation zone euro : n.d. (2025-12, perime)
-- Matieres premieres (EXXY.DE) : 6 mois +1,8 %, 12 mois +27,8 % -> signal eteint (0 seances)
-- Emergents moins monde, 12 mois : +4,9 % -> signal neutre (0 seances)
-- Euro / dollar, 6 mois : -6,4 %
+- Matieres premieres (EXXY.DE) : 6 mois +0,9 %, 12 mois +28,8 % -> signal eteint (0 seances)
+- Emergents moins monde, 12 mois : -1,2 % -> signal neutre (0 seances)
+- Euro / dollar, 6 mois : -6,3 %
