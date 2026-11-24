@@ -1,9 +1,9 @@
 # Veille du 24/11/2026
 
-Cours du 24/11/2026. Calcule le 24/11/2026 a 23:09 (heure de Paris).
+Cours du 24/11/2026. Calcule le 24/11/2026 a 23:10 (heure de Paris).
 
 ## Alertes
-- Nouvelle candidate : Schneider Electric, -27,3 % depuis son plus haut 6 mois, saine (dette/EBITDA 1,9, marge 17,9 %). Delai d un mois apres le dernier choc : atteint.
+- Aucune.
 
 ## Repartition
 - Patrimoine consolide : 257 355 EUR (AV 28 023 EUR, LIV 37 298 EUR, PEA 64 218 EUR, PEG 127 816 EUR)
@@ -42,4 +42,4 @@ Cours du 24/11/2026. Calcule le 24/11/2026 a 23:09 (heure de Paris).
 - Inflation zone euro : n.d. (2025-12, perime)
 - Matieres premieres (EXXY.DE) : 6 mois -1,0 %, 12 mois +26,4 % -> signal eteint (0 seances)
 - Emergents moins monde, 12 mois : +1,4 % -> signal neutre (0 seances)
-- Euro / dollar, 6 mois : -5,8 %
+- Euro / dollar, 6 mois : -5,9 %
