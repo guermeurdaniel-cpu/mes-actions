@@ -1,39 +1,74 @@
 # -*- coding: utf-8 -*-
-"""Patch par remplacements (24/11/2026) : la courbe du patrimoine est recalculee
-jour par jour depuis le 16/06/2026 (et non plus sur 3 mois avec un point
-artificiel au 16/06). Les cours Yahoo sont charges sur un an ; les graphiques par
-ligne restent sur 3 mois. Applique par le workflow patch.yml ; chaque texte doit
-etre trouve une seule fois, sinon aucun fichier n est ecrit."""
+"""Patch par remplacements (24/11/2026, soir) : fiabilite de la veille.
+Un lancement planifie du lundi 23/11 est parti dans la nuit (4 h, heure de Paris) :
+il a date son rapport du mardi (date UTC du serveur) avec les cours du vendredi,
+envoye de fausses alertes, et les lancements du mardi soir n ont rien fait.
+1. date du jour = date de Paris ;
+2. controle de fraicheur : si la derniere seance de WPEA n est pas celle du jour,
+   pas d alerte de mouvement ni de Telegram, et le rapport le dit ;
+3. en tete du rapport : date des cours et heure du calcul ;
+4. pas de Telegram pour un lancement declenche par un commit (demande de Claude
+   via rapports/demande.txt) : la note du soir porte l information.
+Applique par le workflow patch.yml ; chaque texte doit etre trouve une seule fois,
+sinon aucun fichier n est ecrit."""
 import sys
 
 PATCHS = {
-"index.html": [
-("""    const yurl = base + symbol + "?range=3mo&interval=1d";""",
-"""    const yurl = base + symbol + "?range=1y&interval=1d";"""),
-("""        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency, closes:closes, dates:dates};""",
-"""        // Un an de clotures pour la courbe du patrimoine (closesAll / datesAll) ; les
-        // graphiques par ligne gardent les 3 derniers mois (closes / dates).
-        const coupure=new Date(Date.now()-92*864e5).toISOString().slice(0,10);
-        let k0=dates.findIndex(function(d){ return d>=coupure; }); if(k0<0) k0=0;
-        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency,
-                closes:closes.slice(k0), dates:dates.slice(k0), closesAll:closes, datesAll:dates};"""),
-("""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });""",
-"""      if(y && y.q) series.push({ cle:cle, dates:(y.q.datesAll||y.q.dates).slice(), vals:(y.q.closesAll||y.q.closes).slice() });"""),
-("""  // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
-  // a etre enregistree -> aucune valeur reconstruite vers le passe (pas de back-fill).
-  let startDate=null;
-  series.forEach(function(s){
-    const fd=s.dates.slice().sort()[0];
-    if(startDate===null || fd>startDate) startDate=fd;
-  });""",
-"""  // La courbe part du 16/06/2026 (REF_DATE, debut du journal) : chaque jour est
-  // recalcule avec la quantite, le prix et le prix de revient de ce jour-la.
-  const startDate=REF_DATE;"""),
-("""    for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }""",
-"""    for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
-    // Ligne dont le premier prix enregistre est posterieur au 16/06 (fonds du PEG
-    // publies a partir du 18-19/06) : ce premier prix est reporte vers l arriere.
-    if(last===null && sd.length) last=m[sd[0]];"""),
+"veille.py": [
+("""import urllib.request
+""",
+"""import urllib.request
+from zoneinfo import ZoneInfo
+"""),
+("""AUJ = datetime.date.today()
+""",
+"""# Date de Paris, pas celle du serveur (UTC) : un lancement de GitHub retarde apres
+# minuit UTC ne doit pas produire un rapport date du lendemain (incident du 24/11/2026).
+AUJ = datetime.datetime.now(ZoneInfo("Europe/Paris")).date()
+"""),
+("""    # --- 1. Repartition
+    lignes, fonds_euros, manquants, _ = valoriser(series)
+""",
+"""    # --- Fraicheur des cours : la derniere seance de WPEA doit etre celle du jour.
+    # Sinon (lancement retarde dans la nuit, jour ferie, Yahoo en retard), les
+    # variations du jour sont fausses : pas d alerte de mouvement, pas de Telegram.
+    date_cours = series[SYM_MONDE][-1][0] if series[SYM_MONDE] else None
+    cours_du_jour = date_cours == AUJ
+    if not cours_du_jour:
+        ko.append("cours Yahoo du %s, pas du jour : variations du jour non fiables, "
+                  "alertes de mouvement et Telegram suspendus"
+                  % (date_cours.strftime("%d/%m/%Y") if date_cours else "inconnu"))
+
+    # --- 1. Repartition
+    lignes, fonds_euros, manquants, _ = valoriser(series)
+"""),
+("""        if l["var_jour"] is not None and abs(l["var_jour"]) >= cib["ligne_mouvement_jour"]:""",
+"""        if (cours_du_jour and l["var_jour"] is not None
+                and abs(l["var_jour"]) >= cib["ligne_mouvement_jour"]):"""),
+("""    r.append("# Veille du %s" % AUJ.strftime("%d/%m/%Y"))
+    r.append("")
+""",
+"""    r.append("# Veille du %s" % AUJ.strftime("%d/%m/%Y"))
+    r.append("")
+    r.append("Cours du %s%s. Calcule le %s (heure de Paris)."
+             % (date_cours.strftime("%d/%m/%Y") if date_cours else "inconnu",
+                "" if cours_du_jour else " (perimes)",
+                datetime.datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y a %H:%M")))
+    r.append("")
+"""),
+("""    tab = tableau_achetables(cand)
+    if alertes or tab:""",
+"""    # Pas de Telegram si les cours sont perimes, ni pour un lancement declenche par un
+    # commit (demande de Claude via rapports/demande.txt, ou modification du script) :
+    # dans ce cas la note du soir porte l information.
+    tab = tableau_achetables(cand)
+    if os.environ.get("GITHUB_EVENT_NAME") == "push":
+        print("  Telegram : lancement par commit, pas de message")
+        return
+    if not cours_du_jour:
+        print("  Telegram : cours perimes, pas de message")
+        return
+    if alertes or tab:"""),
 ],
 }
 
