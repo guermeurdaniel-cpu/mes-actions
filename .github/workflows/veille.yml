@@ -10,6 +10,17 @@ name: Veille quotidienne
 # deux lancements de secours suivent, a 17:15 et 18:15 UTC. Ils ne font rien
 # si le rapport du jour (rapports/veille-AAAA-MM-JJ.md) existe deja, pour
 # eviter les doublons sur Telegram. Ajoute le 23/11/2026.
+#
+# Corrige le 24/11/2026 : un lancement planifie du lundi est parti avec 10 h de
+# retard (4 h du matin, heure de Paris). Il a ecrit un faux rapport du mardi, avec
+# les cours du vendredi, et les lancements du mardi soir l ont pris pour le rapport
+# du jour et n ont rien fait. Desormais :
+#  - la date du jour est celle de Paris (et non UTC) ;
+#  - un lancement planifie qui part hors de la plage 17 h - 22 h (Paris) est ignore ;
+#  - veille.py verifie que les cours sont ceux du jour.
+#
+# Lancement a la demande de Claude : la tache du soir ecrit rapports/demande.txt,
+# ce qui declenche ce workflow tout de suite (sans Telegram, la note du soir suit).
 
 on:
   schedule:
@@ -19,7 +30,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ 'veille.py', 'cibles.txt', '.github/workflows/veille.yml' ]
+    paths: [ 'veille.py', 'cibles.txt', '.github/workflows/veille.yml', 'rapports/demande.txt' ]
 
 permissions:
   contents: write
@@ -37,9 +48,16 @@ jobs:
       - name: Deja fait aujourd hui ?
         id: deja
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] && [ -f "rapports/veille-$(date -u +%Y-%m-%d).md" ]; then
-            echo "Rapport du jour deja present : rien a faire."
-            echo "fait=oui" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            JOUR=$(TZ=Europe/Paris date +%Y-%m-%d)
+            HEURE=$(TZ=Europe/Paris date +%-H)
+            if [ "$HEURE" -lt 17 ] || [ "$HEURE" -ge 22 ]; then
+              echo "Lancement planifie parti a ${HEURE} h (Paris), hors plage 17-22 h : ignore."
+              echo "fait=oui" >> "$GITHUB_OUTPUT"
+            elif [ -f "rapports/veille-${JOUR}.md" ]; then
+              echo "Rapport du jour deja present : rien a faire."
+              echo "fait=oui" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - uses: actions/setup-python@v5
@@ -64,7 +82,7 @@ jobs:
           git config user.name "veille-bot"
           git config user.email "veille-bot@users.noreply.github.com"
           git add rapports
-          git commit -m "veille $(date -u +%Y-%m-%d)" || exit 0
+          git commit -m "veille $(TZ=Europe/Paris date +%Y-%m-%d)" || exit 0
           for i in 1 2 3; do
             git pull --rebase && git push && break
             sleep 10
