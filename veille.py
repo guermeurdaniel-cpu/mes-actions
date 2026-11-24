@@ -37,13 +37,16 @@ import json
 import os
 import re
 import urllib.request
+from zoneinfo import ZoneInfo
 
 from curl_cffi import requests as creq
 
 import supports as supports_mod
 import patrimoine as pat
 
-AUJ = datetime.date.today()
+# Date de Paris, pas celle du serveur (UTC) : un lancement de GitHub retarde apres
+# minuit UTC ne doit pas produire un rapport date du lendemain (incident du 24/11/2026).
+AUJ = datetime.datetime.now(ZoneInfo("Europe/Paris")).date()
 JOUR = AUJ.isoformat()
 DOSSIER = "rapports"
 URL_ZE = "https://raw.githubusercontent.com/guermeurdaniel-cpu/telemesure-zone-euro/main/"
@@ -392,6 +395,16 @@ def main():
     for sym in (SYM_MONDE, SYM_EM, SYM_MP, SYM_CHANGE, SYM_EU):
         series[sym] = serie_yahoo(sym, "1y")
 
+    # --- Fraicheur des cours : la derniere seance de WPEA doit etre celle du jour.
+    # Sinon (lancement retarde dans la nuit, jour ferie, Yahoo en retard), les
+    # variations du jour sont fausses : pas d alerte de mouvement, pas de Telegram.
+    date_cours = series[SYM_MONDE][-1][0] if series[SYM_MONDE] else None
+    cours_du_jour = date_cours == AUJ
+    if not cours_du_jour:
+        ko.append("cours Yahoo du %s, pas du jour : variations du jour non fiables, "
+                  "alertes de mouvement et Telegram suspendus"
+                  % (date_cours.strftime("%d/%m/%Y") if date_cours else "inconnu"))
+
     # --- 1. Repartition
     lignes, fonds_euros, manquants, _ = valoriser(series)
     if manquants:
@@ -463,7 +476,8 @@ def main():
         poids = l["valeur"] / total if total else 0
         lignes_txt.append("- %s (%s) : %s, %s du patrimoine, jour %s"
                           % (l["nom"], l["env"], eur(l["valeur"]), pc(poids), pc(l["var_jour"], True)))
-        if l["var_jour"] is not None and abs(l["var_jour"]) >= cib["ligne_mouvement_jour"]:
+        if (cours_du_jour and l["var_jour"] is not None
+                and abs(l["var_jour"]) >= cib["ligne_mouvement_jour"]):
             alertes.append("%s a bouge de %s aujourd hui : analyse a faire ce soir."
                            % (l["nom"], pc(l["var_jour"], True)))
         if poids > cib["ligne_individuelle_max"]:
@@ -535,6 +549,11 @@ def main():
     r = []
     r.append("# Veille du %s" % AUJ.strftime("%d/%m/%Y"))
     r.append("")
+    r.append("Cours du %s%s. Calcule le %s (heure de Paris)."
+             % (date_cours.strftime("%d/%m/%Y") if date_cours else "inconnu",
+                "" if cours_du_jour else " (perimes)",
+                datetime.datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y a %H:%M")))
+    r.append("")
     r.append("## Alertes")
     r += (["- " + a for a in alertes] if alertes else ["- Aucune."])
     r.append("")
@@ -601,7 +620,16 @@ def main():
     print(texte)
 
     # Telegram : chaque jour s il y a une alerte ou au moins une candidate achetable.
+    # Pas de Telegram si les cours sont perimes, ni pour un lancement declenche par un
+    # commit (demande de Claude via rapports/demande.txt, ou modification du script) :
+    # dans ce cas la note du soir porte l information.
     tab = tableau_achetables(cand)
+    if os.environ.get("GITHUB_EVENT_NAME") == "push":
+        print("  Telegram : lancement par commit, pas de message")
+        return
+    if not cours_du_jour:
+        print("  Telegram : cours perimes, pas de message")
+        return
     if alertes or tab:
         e = html.escape
         blocs = ["<b>Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
