@@ -645,7 +645,7 @@ function buildTotalSeries(data, hist, yres, costBasis){
     if(estFixe(cle)) return;   // livrets : ajoutes plus bas, solde du journal a chaque date
     if(estCote(cle)){
       const y=yres[cle];
-      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });
+      if(y && y.q) series.push({ cle:cle, dates:(y.q.datesAll||y.q.dates).slice(), vals:(y.q.closesAll||y.q.closes).slice() });
     } else {
       const h=hist[cle]||[], f=data[cle];
       if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return e.value;}) });
@@ -653,13 +653,9 @@ function buildTotalSeries(data, hist, yres, costBasis){
     }
   });
   if(!series.length) return null;
-  // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
-  // a etre enregistree -> aucune valeur reconstruite vers le passe (pas de back-fill).
-  let startDate=null;
-  series.forEach(function(s){
-    const fd=s.dates.slice().sort()[0];
-    if(startDate===null || fd>startDate) startDate=fd;
-  });
+  // La courbe part du 16/06/2026 (REF_DATE, debut du journal) : chaque jour est
+  // recalcule avec la quantite, le prix et le prix de revient de ce jour-la.
+  const startDate=REF_DATE;
   const dset={};
   series.forEach(function(s){ s.dates.forEach(function(d){ if(d>=startDate) dset[d]=1; }); });
   const dates=Object.keys(dset).sort();
@@ -680,6 +676,9 @@ function buildTotalSeries(data, hist, yres, costBasis){
     const sd=s.dates.slice().sort();
     let last=null;
     for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
+    // Ligne dont le premier prix enregistre est posterieur au 16/06 (fonds du PEG
+    // publies a partir du 18-19/06) : ce premier prix est reporte vers l arriere.
+    if(last===null && sd.length) last=m[sd[0]];
     for(let i=0;i<dates.length;i++){
       if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte le dernier PRIX connu
       if(last!=null){
@@ -835,7 +834,7 @@ async function fetchYahoo(symbol){
   const proxies = MON_PROXY ? [{u:MON_PROXY,enc:true}, ...YH_PROXIES] : YH_PROXIES.slice();
   let lastErr = null;
   for(const base of bases){
-    const yurl = base + symbol + "?range=3mo&interval=1d";
+    const yurl = base + symbol + "?range=1y&interval=1d";
     for(const p of proxies){
       const target = p.u + (p.enc ? encodeURIComponent(yurl) : yurl);
       const ctl = new AbortController();
@@ -908,7 +907,12 @@ async function fetchYahoo(symbol){
         }
 
 
-        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency, closes:closes, dates:dates};
+        // Un an de clotures pour la courbe du patrimoine (closesAll / datesAll) ; les
+        // graphiques par ligne gardent les 3 derniers mois (closes / dates).
+        const coupure=new Date(Date.now()-92*864e5).toISOString().slice(0,10);
+        let k0=dates.findIndex(function(d){ return d>=coupure; }); if(k0<0) k0=0;
+        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency,
+                closes:closes.slice(k0), dates:dates.slice(k0), closesAll:closes, datesAll:dates};
       }catch(e){
         clearTimeout(timer);
         lastErr = e;   // proxy mort / timeout / CORS -> proxy suivant
