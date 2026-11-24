@@ -635,7 +635,7 @@ function coutA(cle, date){
 // Renvoie aussi, a chaque date, le cout de revient des lignes detenues (costs) :
 // gains cumules = values - costs, meme definition que la PMV du haut de la page.
 function buildTotalSeries(data, hist, yres, costBasis){
-  const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR
+  const series=[]; // chaque element : {cle, dates:[...], vals:[...]} ; vals = prix unitaires (cloture ou VL)
   // Une passe sur le catalogue : chaque support fournit sa serie, cotee ou non
   SUPPORTS.forEach(function(sup){
     const cle=sup.cle, q=qtyOf(cle);
@@ -645,11 +645,11 @@ function buildTotalSeries(data, hist, yres, costBasis){
     if(estFixe(cle)) return;   // livrets : ajoutes plus bas, solde du journal a chaque date
     if(estCote(cle)){
       const y=yres[cle];
-      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });
+      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });
     } else {
       const h=hist[cle]||[], f=data[cle];
-      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
-      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[q*f.value] });
+      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return e.value;}) });
+      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[f.value] });
     }
   });
   if(!series.length) return null;
@@ -681,11 +681,14 @@ function buildTotalSeries(data, hist, yres, costBasis){
     let last=null;
     for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
     for(let i=0;i<dates.length;i++){
-      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte la derniere VL connue
+      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte le dernier PRIX connu
       if(last!=null){
-        values[i]+=last;
+        // quantite detenue A CETTE DATE x dernier prix connu : une vente ou un achat
+        // posterieur a la derniere VL publiee est bien pris en compte
+        const v=qteA(s.cle, dates[i])*last;
+        values[i]+=v;
         const c=coutA(s.cle, dates[i]);
-        costs[i]+=(c!=null? c : last);   // sans prix d achat connu : gain compte nul
+        costs[i]+=(c!=null? c : v);   // sans prix d achat connu : gain compte nul
       }
     }
   });
