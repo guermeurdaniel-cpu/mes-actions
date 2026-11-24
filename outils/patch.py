@@ -1,39 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Patch par remplacements (24/11/2026) : dans la courbe du patrimoine, le report
-de la derniere valeur connue reportait une VALEUR (quantite d une date passee x
-prix). Une ligne vendue apres sa derniere VL publiee (Carmignac, ODDO, vendus le
-21/11 avec une VL du 19/11 et du 17/11) restait donc comptee apres la vente, avec
-un cout nul : gain fantome d environ 3 270 EUR, d ou l ecart entre la courbe et la
-synthese. Desormais on reporte le PRIX, multiplie par la quantite detenue a
-chaque date. Applique par le workflow patch.yml ; chaque texte doit etre trouve
-une seule fois, sinon aucun fichier n est ecrit."""
+"""Patch par remplacements (24/11/2026) : la courbe du patrimoine est recalculee
+jour par jour depuis le 16/06/2026 (et non plus sur 3 mois avec un point
+artificiel au 16/06). Les cours Yahoo sont charges sur un an ; les graphiques par
+ligne restent sur 3 mois. Applique par le workflow patch.yml ; chaque texte doit
+etre trouve une seule fois, sinon aucun fichier n est ecrit."""
 import sys
 
 PATCHS = {
 "index.html": [
-("""  const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR""",
-"""  const series=[]; // chaque element : {cle, dates:[...], vals:[...]} ; vals = prix unitaires (cloture ou VL)"""),
-("""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });""",
-"""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });"""),
-("""      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
-      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[q*f.value] });""",
-"""      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return e.value;}) });
-      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[f.value] });"""),
-("""      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte la derniere VL connue
-      if(last!=null){
-        values[i]+=last;
-        const c=coutA(s.cle, dates[i]);
-        costs[i]+=(c!=null? c : last);   // sans prix d achat connu : gain compte nul
-      }""",
-"""      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte le dernier PRIX connu
-      if(last!=null){
-        // quantite detenue A CETTE DATE x dernier prix connu : une vente ou un achat
-        // posterieur a la derniere VL publiee est bien pris en compte
-        const v=qteA(s.cle, dates[i])*last;
-        values[i]+=v;
-        const c=coutA(s.cle, dates[i]);
-        costs[i]+=(c!=null? c : v);   // sans prix d achat connu : gain compte nul
-      }"""),
+("""    const yurl = base + symbol + "?range=3mo&interval=1d";""",
+"""    const yurl = base + symbol + "?range=1y&interval=1d";"""),
+("""        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency, closes:closes, dates:dates};""",
+"""        // Un an de clotures pour la courbe du patrimoine (closesAll / datesAll) ; les
+        // graphiques par ligne gardent les 3 derniers mois (closes / dates).
+        const coupure=new Date(Date.now()-92*864e5).toISOString().slice(0,10);
+        let k0=dates.findIndex(function(d){ return d>=coupure; }); if(k0<0) k0=0;
+        return {price:price, prev:prev, prevDate:prevDate, prevSrc:prevSrc, cur:m.currency,
+                closes:closes.slice(k0), dates:dates.slice(k0), closesAll:closes, datesAll:dates};"""),
+("""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });""",
+"""      if(y && y.q) series.push({ cle:cle, dates:(y.q.datesAll||y.q.dates).slice(), vals:(y.q.closesAll||y.q.closes).slice() });"""),
+("""  // Fenetre honnete : on demarre a la date la plus tardive ou CHAQUE ligne a commence
+  // a etre enregistree -> aucune valeur reconstruite vers le passe (pas de back-fill).
+  let startDate=null;
+  series.forEach(function(s){
+    const fd=s.dates.slice().sort()[0];
+    if(startDate===null || fd>startDate) startDate=fd;
+  });""",
+"""  // La courbe part du 16/06/2026 (REF_DATE, debut du journal) : chaque jour est
+  // recalcule avec la quantite, le prix et le prix de revient de ce jour-la.
+  const startDate=REF_DATE;"""),
+("""    for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }""",
+"""    for(let i=0;i<sd.length;i++){ if(sd[i]<=startDate) last=m[sd[i]]; }
+    // Ligne dont le premier prix enregistre est posterieur au 16/06 (fonds du PEG
+    // publies a partir du 18-19/06) : ce premier prix est reporte vers l arriere.
+    if(last===null && sd.length) last=m[sd[0]];"""),
 ],
 }
 
