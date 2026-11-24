@@ -1,57 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Patch par remplacements (21/11/2026) : l en-tete lit realises.csv (plus et
-moins-values des ventes, genere par realises.py) et affiche les gains et pertes
-depuis juin 2026 : en cours (lignes detenues) + realises (ventes) = total, et son
-% du patrimoine. Applique par le workflow patch.yml ; chaque texte doit etre
-trouve une seule fois, sinon aucun fichier n est ecrit."""
+"""Patch par remplacements (24/11/2026) : dans la courbe du patrimoine, le report
+de la derniere valeur connue reportait une VALEUR (quantite d une date passee x
+prix). Une ligne vendue apres sa derniere VL publiee (Carmignac, ODDO, vendus le
+21/11 avec une VL du 19/11 et du 17/11) restait donc comptee apres la vente, avec
+un cout nul : gain fantome d environ 3 270 EUR, d ou l ecart entre la courbe et la
+synthese. Desormais on reporte le PRIX, multiplie par la quantite detenue a
+chaque date. Applique par le workflow patch.yml ; chaque texte doit etre trouve
+une seule fois, sinon aucun fichier n est ecrit."""
 import sys
 
 PATCHS = {
 "index.html": [
-("""  try{
-    const pR=await fetch("patrimoine.json?t="+Date.now());
-    if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
-  }catch(e){}""",
-"""  try{
-    const pR=await fetch("patrimoine.json?t="+Date.now());
-    if(pR.ok){ const pj=await pR.json(); if(Array.isArray(pj)) patHist=pj; }
-  }catch(e){}
-  // realises.csv : plus et moins-values des ventes, genere par realises.py a chaque
-  // modification du journal. null si absent (calcul de secours plus bas).
-  let realisesTot=null;
-  try{
-    const rR=await fetch("realises.csv?t="+Date.now(), {cache:"no-store"});
-    if(rR.ok){
-      let t=0;
-      (await rR.text()).split(/\\r?\\n/).forEach(function(l){
-        l=l.trim(); if(!l || l.charAt(0)==="#" || l.indexOf("date;")===0) return;
-        const c=l.split(";"); const v=parseFloat(c[6]); if(!isNaN(v)) t+=v;
-      });
-      realisesTot=t;
-    }
-  }catch(e){}"""),
-("""    // Gains ou pertes depuis juin 2026 : patrimoine - apports nets (versements moins
-    // retraits, ventes comprises), rapportes au patrimoine du jour.
-    const apportsNets=investiA(todayStr());
-    if(apportsNets>0){
-      const gJ=pmv.totDay-apportsNets, pJ=gJ/pmv.totDay*100, sgJ=gJ>=0?"+":"";
-      progHtml+=
-        '<div class="meta">Depuis juin 2026 : <span class="'+(gJ>=0?"prog-up":"prog-down")+'">'
-        +sgJ+eur(gJ)+', soit '+sgJ+pJ.toFixed(2)+'% du patrimoine</span>'
-        +' (ventes et arbitrages compris)</div>';
-    }""",
-"""    // Gains et pertes depuis juin 2026 : en cours (lignes detenues, PMV ci-dessus)
-    // + realises (ventes, realises.csv) = total, rapporte au patrimoine du jour.
-    // Secours si realises.csv manque : total = patrimoine - apports nets.
-    const enCours=pmv.totGain;
-    const realise=(realisesTot!==null)? realisesTot : (pmv.totDay-investiA(todayStr()))-enCours;
-    const totJ=enCours+realise, pJ=totJ/pmv.totDay*100;
-    function sgn(x){ return x>=0? "+" : ""; }
-    function cls(x){ return x>=0? "prog-up" : "prog-down"; }
-    progHtml+=
-      '<div class="meta">Depuis juin 2026 : en cours <span class="'+cls(enCours)+'">'+sgn(enCours)+eur(enCours)+'</span>'
-      +' + realises <span class="'+cls(realise)+'">'+sgn(realise)+eur(realise)+'</span>'
-      +' = <span class="'+cls(totJ)+'">'+sgn(totJ)+eur(totJ)+', soit '+sgn(totJ)+pJ.toFixed(2)+'% du patrimoine</span></div>';"""),
+("""  const series=[]; // chaque element : {dates:[...], vals:[...]} en EUR""",
+"""  const series=[]; // chaque element : {cle, dates:[...], vals:[...]} ; vals = prix unitaires (cloture ou VL)"""),
+("""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.map(function(c,i){ return qteA(cle,y.q.dates[i])*c; }) });""",
+"""      if(y && y.q) series.push({ cle:cle, dates:y.q.dates, vals:y.q.closes.slice() });"""),
+("""      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return qteA(cle,e.date)*e.value;}) });
+      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[q*f.value] });""",
+"""      if(h.length) series.push({ cle:cle, dates:h.map(function(e){return e.date;}), vals:h.map(function(e){return e.value;}) });
+      else if(f && f.value!=null) series.push({ cle:cle, dates:[todayStr()], vals:[f.value] });"""),
+("""      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte la derniere VL connue
+      if(last!=null){
+        values[i]+=last;
+        const c=coutA(s.cle, dates[i]);
+        costs[i]+=(c!=null? c : last);   // sans prix d achat connu : gain compte nul
+      }""",
+"""      if(m[dates[i]]!=null) last=m[dates[i]]; // sinon on reporte le dernier PRIX connu
+      if(last!=null){
+        // quantite detenue A CETTE DATE x dernier prix connu : une vente ou un achat
+        // posterieur a la derniere VL publiee est bien pris en compte
+        const v=qteA(s.cle, dates[i])*last;
+        values[i]+=v;
+        const c=coutA(s.cle, dates[i]);
+        costs[i]+=(c!=null? c : v);   // sans prix d achat connu : gain compte nul
+      }"""),
 ],
 }
 
