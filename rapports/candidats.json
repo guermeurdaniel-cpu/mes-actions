@@ -3,12 +3,12 @@
   "nom": "BE Semiconductor",
   "delai_ok": false
  },
- "RHM.DE": {
-  "nom": "Rheinmetall",
-  "delai_ok": false
- },
  "ASM.AS": {
   "nom": "ASM International",
+  "delai_ok": false
+ },
+ "RHM.DE": {
+  "nom": "Rheinmetall",
   "delai_ok": false
  },
  "VK.PA": {
@@ -31,6 +31,14 @@
   "nom": "ASML",
   "delai_ok": false
  },
+ "SU.PA": {
+  "nom": "Schneider Electric",
+  "delai_ok": true
+ },
+ "EXENS.PA": {
+  "nom": "Exosens",
+  "delai_ok": false
+ },
  "RMS.PA": {
   "nom": "Hermès",
   "delai_ok": true
@@ -43,16 +51,8 @@
   "nom": "Moncler",
   "delai_ok": false
  },
- "SU.PA": {
-  "nom": "Schneider Electric",
-  "delai_ok": true
- },
  "WAVE.PA": {
   "nom": "Wavestone",
   "delai_ok": true
- },
- "EXENS.PA": {
-  "nom": "Exosens",
-  "delai_ok": false
  }
 }
