@@ -3,6 +3,12 @@ name: Envoi des notes sur Telegram
 # Chaque note ecrite par Claude dans notes/ (note quotidienne, revue mensuelle)
 # est envoyee sur Telegram des qu elle arrive dans le depot. Les notes de plus
 # de 3 800 caracteres partent en plusieurs messages.
+#
+# Mise en forme (25/11/2026) : la note reste en texte simple dans le depot ; a
+# l envoi, le titre et les sections passent en gras avec une icone, les tirets
+# deviennent des puces, le nom en tete de puce et les « Verdict : » / « Avis : »
+# sont en gras (mode HTML de Telegram). Si Telegram refuse le HTML, la note
+# repart en texte brut.
 
 on:
   push:
@@ -31,7 +37,71 @@ jobs:
           MANUEL: ${{ github.event.inputs.fichier }}
         run: |
           python3 - <<'PY'
-          import os, subprocess, urllib.parse, urllib.request
+          import html, os, re, subprocess, urllib.error, urllib.parse, urllib.request
+
+          ICONES = {"verdict": "✅", "march": "\U0001F30D", "signaux": "\U0001F4E1",
+                    "lignes": "\U0001F4CC", "bonnes affaires": "\U0001F50E",
+                    "points faibles": "⚠️", "limites": "⚠️",
+                    "versement": "\U0001F4B6", "réservoirs": "\U0001FAA3",
+                    "exécution": "\U0001F9FE"}
+
+          def icone(titre):
+              t = titre.lower()
+              for cle, ic in ICONES.items():
+                  if t.startswith(cle):
+                      return ic
+              return "▪️"
+
+          def gras_avis(s):
+              return re.sub(r"\b(Verdict|Avis) : ([^.;]+)", r"<b>\1 : \2</b>", s)
+
+          def mettre_en_forme(texte):
+              sortie, premiere = [], True
+              for brut in texte.splitlines():
+                  ligne = brut.rstrip()
+                  if not ligne.strip():
+                      sortie.append("")
+                      continue
+                  e = html.escape(ligne.strip(), quote=False)
+                  if premiere:
+                      sortie.append("<b>\U0001F4CA %s</b>" % e)
+                      premiere = False
+                  elif ligne.startswith(("- ", "* ")):
+                      corps = e[2:]
+                      m = re.match(r"^([^:]{1,45}?) : ", corps)
+                      if m:
+                          corps = "<b>%s</b> : %s" % (m.group(1), corps[m.end():])
+                      sortie.append("• " + gras_avis(corps))
+                  elif len(e) <= 40 and not e.endswith((".", ":")):
+                      if sortie and sortie[-1] != "":
+                          sortie.append("")
+                      sortie.append("<b>%s %s</b>" % (icone(e), e))
+                  else:
+                      sortie.append(gras_avis(e))
+              return re.sub(r"\n{3,}", "\n\n", "\n".join(sortie)).strip()
+
+          def morceaux(texte, limite=3800):
+              blocs, courant = [], ""
+              for bloc in texte.split("\n\n"):
+                  if courant and len(courant) + len(bloc) + 2 > limite:
+                      blocs.append(courant)
+                      courant = ""
+                  courant = (courant + "\n\n" + bloc) if courant else bloc
+              if courant.strip():
+                  blocs.append(courant)
+              return blocs
+
+          tok, chat = os.environ["TELEGRAM_TOKEN"], os.environ["TELEGRAM_CHAT_ID"]
+
+          def envoyer(texte, html_mode):
+              donnees = {"chat_id": chat, "text": texte, "disable_web_page_preview": "true"}
+              if html_mode:
+                  donnees["parse_mode"] = "HTML"
+              data = urllib.parse.urlencode(donnees).encode()
+              r = urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % tok,
+                                         data=data, timeout=20)
+              return r.status
+
           if os.environ.get("MANUEL"):
               fichiers = [os.environ["MANUEL"]]
           else:
@@ -42,18 +112,14 @@ jobs:
                                        avant, os.environ["APRES"], "--", "notes/"],
                                       capture_output=True, text=True).stdout
               fichiers = [f for f in sortie.split() if f.endswith(".md")]
-          tok, chat = os.environ["TELEGRAM_TOKEN"], os.environ["TELEGRAM_CHAT_ID"]
+
           for f in sorted(fichiers):
               texte = open(f, encoding="utf-8").read()
-              morceaux, courant = [], ""
-              for ligne in texte.splitlines(keepends=True):
-                  if len(courant) + len(ligne) > 3800:
-                      morceaux.append(courant); courant = ""
-                  courant += ligne
-              if courant.strip():
-                  morceaux.append(courant)
-              for m in morceaux:
-                  data = urllib.parse.urlencode({"chat_id": chat, "text": m}).encode()
-                  r = urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % tok, data=data, timeout=20)
-                  print(f, "->", r.status)
+              try:
+                  for m in morceaux(mettre_en_forme(texte)):
+                      print(f, "-> HTML", envoyer(m, True))
+              except urllib.error.HTTPError as err:
+                  print(f, "-> HTML refuse (%s), envoi en texte brut" % err.code)
+                  for m in morceaux(texte):
+                      print(f, "-> texte", envoyer(m, False))
           PY
