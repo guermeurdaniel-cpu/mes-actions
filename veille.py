@@ -353,6 +353,17 @@ def est_jour_versement(cib):
     return AUJ == d
 
 
+def lancement_du_soir():
+    """Vrai si le workflow a ete declenche par la demande de la tache du soir
+    (commit de rapports/demande.txt, message « demande de veille ... »)."""
+    try:
+        with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
+            ev = json.load(f)
+        return (ev.get("head_commit") or {}).get("message", "").startswith("demande de veille")
+    except Exception:
+        return False
+
+
 def telegram(texte, html_mode=False):
     """Envoi en morceaux de 3 800 caracteres. En mode HTML, le texte doit deja etre
     echappe, et les morceaux sont coupes entre deux blocs (jamais dans un <pre>)."""
@@ -389,6 +400,8 @@ def main():
     hist = lire_historique()
     veille = hist[-1] if hist else {}
     alertes, sections, ko = [], [], []
+    # Rapport du jour deja ecrit par un lancement planifie (qui a envoye le message) ?
+    rapport_deja_fait = os.path.exists(os.path.join(DOSSIER, "veille-%s.md" % JOUR))
 
     # --- Series de reference
     series = {}
@@ -625,24 +638,27 @@ def main():
     # dans ce cas la note du soir porte l information.
     tab = tableau_achetables(cand)
     if os.environ.get("GITHUB_EVENT_NAME") == "push":
-        print("  Telegram : lancement par commit, pas de message")
-        return
+        if not lancement_du_soir():
+            print("  Telegram : lancement par modification du depot, pas de message")
+            return
+        if rapport_deja_fait:
+            print("  Telegram : deja envoye par le lancement planifie du jour")
+            return
     if not cours_du_jour:
         print("  Telegram : cours perimes, pas de message")
         return
     if alertes or tab:
         e = html.escape
-        blocs = ["<b>Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
-        if alertes:
-            blocs.append("\n".join("- " + e(a) for a in alertes))
-        if tab:
-            blocs.append("<b>Bonnes affaires achetables</b> (delai d un mois atteint)\n<pre>"
-                         + e("\n".join(tab)) + "</pre>\n"
-                         "Baisse depuis le plus haut 6 mois. PER : cours / benefice des 12 derniers "
-                         "mois. PERa : cours / benefice attendu. Div : dividende annuel / cours.")
-        blocs.append(e("Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
-                       % (pc(part_act), pc(1 - part_act), pc(cible),
+        blocs = ["<b>\U0001F4CB Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
+        blocs.append(e("Actions %s / cible %s\nMSCI World %s du plus haut"
+                       % (pc(part_act), pc(cible),
                           pc(-baisse_monde if baisse_monde is not None else None, True))))
+        if alertes:
+            blocs.append("<b>Alertes</b>\n" + "\n".join("\u2022 " + e(a) for a in alertes))
+        if tab:
+            blocs.append("<b>\U0001F50E Bonnes affaires achetables</b>\n<pre>"
+                         + e("\n".join(tab)) + "</pre>\n"
+                         "<i>Baisse sur 6 mois, PER, PER attendu, dividende</i>")
         telegram("\n\n".join(blocs), html_mode=True)
 
 
