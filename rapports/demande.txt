@@ -1,2 +1,2 @@
-Demande de veille par Claude : 25/11/2026 20:13 (heure de Paris).
+Demande de veille par Claude : 26/11/2026 20:14 (heure de Paris).
 Ce fichier est reecrit par la tache du soir pour relancer veille.py avant la note.
