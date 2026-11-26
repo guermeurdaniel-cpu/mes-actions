@@ -35,20 +35,20 @@
   "nom": "Schneider Electric",
   "delai_ok": true
  },
- "EXENS.PA": {
-  "nom": "Exosens",
-  "delai_ok": false
- },
  "RMS.PA": {
   "nom": "Hermès",
   "delai_ok": true
+ },
+ "MONC.MI": {
+  "nom": "Moncler",
+  "delai_ok": false
  },
  "EQS.PA": {
   "nom": "Equasens",
   "delai_ok": true
  },
- "MONC.MI": {
-  "nom": "Moncler",
+ "EXENS.PA": {
+  "nom": "Exosens",
   "delai_ok": false
  },
  "WAVE.PA": {
