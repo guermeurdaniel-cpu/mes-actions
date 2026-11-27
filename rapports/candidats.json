@@ -19,12 +19,12 @@
   "nom": "Melexis",
   "delai_ok": true
  },
- "ENR.DE": {
-  "nom": "Siemens Energy",
-  "delai_ok": false
- },
  "NESTE.HE": {
   "nom": "Neste",
+  "delai_ok": false
+ },
+ "ENR.DE": {
+  "nom": "Siemens Energy",
   "delai_ok": false
  },
  "ASML.AS": {
@@ -35,10 +35,6 @@
   "nom": "Schneider Electric",
   "delai_ok": true
  },
- "RMS.PA": {
-  "nom": "Hermès",
-  "delai_ok": true
- },
  "MONC.MI": {
   "nom": "Moncler",
   "delai_ok": false
@@ -47,9 +43,9 @@
   "nom": "Equasens",
   "delai_ok": true
  },
- "EXENS.PA": {
-  "nom": "Exosens",
-  "delai_ok": false
+ "RMS.PA": {
+  "nom": "Hermès",
+  "delai_ok": true
  },
  "WAVE.PA": {
   "nom": "Wavestone",
