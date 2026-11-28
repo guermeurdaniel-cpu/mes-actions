@@ -3,9 +3,9 @@
 # =============================================================================
 #  Une ligne par vente ou sortie d arbitrage du journal apports.csv.
 #  plus_value = quantite vendue x (prix de vente - prix de revient moyen a la date)
-#  Mis a jour le 28/11/2026. Total realise : -19.09 EUR.
+#  Mis a jour le 28/11/2026. Total realise : -19.02 EUR.
 # -----------------------------------------------------------------------------
 date;support;quantite_vendue;prix_vente;prix_revient;montant_vente;plus_value
-2026-11-21;Carmignac Securite;1.691700;1917.5000;1924.0800;3243.83;-11.13
-2026-11-21;ETF Euro Corporate SRI;14.367600;226.0000;226.5500;3247.08;-7.90
-2026-11-21;ODDO Global Target 2029;0.271500;110.0800;110.2900;29.89;-0.06
+2026-11-21;Carmignac Securite;1.685362;1917.5000;1924.0800;3231.68;-11.09
+2026-11-21;ETF Euro Corporate SRI;14.313772;226.0000;226.5500;3234.91;-7.87
+2026-11-21;ODDO Global Target 2029;0.270483;110.0800;110.2900;29.77;-0.06
