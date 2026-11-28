@@ -1,71 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Patch par remplacements (25/11/2026, soir) : retour du message Telegram de la veille.
-Depuis le 24/11, le seul lancement fiable de veille.py est celui que declenche la
-tache du soir (commit de rapports/demande.txt), et ce lancement n envoyait rien sur
-Telegram : la liste des bonnes affaires n arrivait plus.
-1. Un lancement par commit envoie le message s il vient de la demande du soir
-   (message de commit commencant par « demande de veille »), sauf si un lancement
-   planifie a deja ecrit le rapport du jour (et donc deja envoye le message).
-   Une simple modification du script n envoie toujours rien.
-2. Message plus lisible : puces, titres en gras, legende du tableau raccourcie.
+"""Patch par remplacements (28/11/2026) : frais de gestion trimestriels des unites
+de compte de l assurance vie. index.html lit le nouveau champ frais de supports.txt
+(% par trimestre) et deduit automatiquement, au dernier jour de chaque trimestre
+echu, parts detenues x taux, sans prix (le PRU ne bouge pas, ce n est pas un
+retrait). Les frais calcules n apparaissent pas dans les derniers mouvements de
+l onglet Saisie. Meme calcul que supports.frais_trimestriels() cote Python.
 Applique par le workflow patch.yml ; chaque texte doit etre trouve une seule fois,
 sinon aucun fichier n est ecrit."""
 import sys
 
 PATCHS = {
-"veille.py": [
-("""    alertes, sections, ko = [], [], []
-""",
-"""    alertes, sections, ko = [], [], []
-    # Rapport du jour deja ecrit par un lancement planifie (qui a envoye le message) ?
-    rapport_deja_fait = os.path.exists(os.path.join(DOSSIER, "veille-%s.md" % JOUR))
-"""),
-("""    if os.environ.get("GITHUB_EVENT_NAME") == "push":
-        print("  Telegram : lancement par commit, pas de message")
-        return
-""",
-"""    if os.environ.get("GITHUB_EVENT_NAME") == "push":
-        if not lancement_du_soir():
-            print("  Telegram : lancement par modification du depot, pas de message")
-            return
-        if rapport_deja_fait:
-            print("  Telegram : deja envoye par le lancement planifie du jour")
-            return
-"""),
-("""def telegram(texte, html_mode=False):""",
-"""def lancement_du_soir():
-    \"\"\"Vrai si le workflow a ete declenche par la demande de la tache du soir
-    (commit de rapports/demande.txt, message « demande de veille ... »).\"\"\"
-    try:
-        with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
-            ev = json.load(f)
-        return (ev.get("head_commit") or {}).get("message", "").startswith("demande de veille")
-    except Exception:
-        return False
-
-
-def telegram(texte, html_mode=False):"""),
-("""        blocs = ["<b>Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
-        if alertes:
-            blocs.append("\\n".join("- " + e(a) for a in alertes))
-        if tab:
-            blocs.append("<b>Bonnes affaires achetables</b> (delai d un mois atteint)\\n<pre>"
-                         + e("\\n".join(tab)) + "</pre>\\n"
-                         "Baisse depuis le plus haut 6 mois. PER : cours / benefice des 12 derniers "
-                         "mois. PERa : cours / benefice attendu. Div : dividende annuel / cours.")
-        blocs.append(e("Actions %s / defensif %s (cible %s). MSCI World %s du plus haut."
-                       % (pc(part_act), pc(1 - part_act), pc(cible),
-                          pc(-baisse_monde if baisse_monde is not None else None, True))))""",
-"""        blocs = ["<b>\\U0001F4CB Veille du %s</b>" % AUJ.strftime("%d/%m/%Y")]
-        blocs.append(e("Actions %s / cible %s\\nMSCI World %s du plus haut"
-                       % (pc(part_act), pc(cible),
-                          pc(-baisse_monde if baisse_monde is not None else None, True))))
-        if alertes:
-            blocs.append("<b>Alertes</b>\\n" + "\\n".join("\\u2022 " + e(a) for a in alertes))
-        if tab:
-            blocs.append("<b>\\U0001F50E Bonnes affaires achetables</b>\\n<pre>"
-                         + e("\\n".join(tab)) + "</pre>\\n"
-                         "<i>Baisse sur 6 mois, PER, PER attendu, dividende</i>")"""),
+"index.html": [
+('actions:0, geo:{monde:0,euro:0,em:0}, taux:[], ligne:i+1};',
+ 'actions:0, geo:{monde:0,euro:0,em:0}, taux:[], frais:0, ligne:i+1};'),
+('    else if(champ==="taux")      courant.taux=lireTaux(val, erreurs);\n',
+ '    else if(champ==="taux")      courant.taux=lireTaux(val, erreurs);\n    else if(champ==="frais")     courant.frais=nombreFr(val)||0;\n'),
+('  for(const cle in achats){ if(achats[cle].qte>0) PRU[cle]=achats[cle].cout/achats[cle].qte; }\n  APPORTS.sort(',
+ '  for(const cle in achats){ if(achats[cle].qte>0) PRU[cle]=achats[cle].cout/achats[cle].qte; }\n  ajouterFrais();\n  APPORTS.sort('),
+('async function chargerApports(){',
+ '// Frais de gestion des unites de compte (champ frais de supports.txt, en % par\n// trimestre) : l assureur les preleve en diminuant le nombre de parts. On cree\n// un mouvement virtuel au dernier jour de chaque trimestre echu, egal aux parts\n// detenues ce jour-la x taux, sans prix : la quantite baisse, le PRU ne bouge\n// pas, et ce n est pas un retrait (investiA l ignore), donc c est une perte.\n// Meme calcul que supports.frais_trimestriels() cote Python.\nfunction ajouterFrais(){\n  const auj=todayStr();\n  SUPPORTS.forEach(function(s){\n    if(!s.frais) return;\n    const f=s.frais/100;\n    const mv=APPORTS.filter(function(a){ return a.cle===s.cle; });\n    const dates=mv.map(function(a){ return a.date; }).filter(Boolean).sort();\n    if(!dates.length) return;\n    const fins=["-03-31","-06-30","-09-30","-12-31"];\n    const prel=[];\n    for(let an=parseInt(dates[0].slice(0,4),10); an<=parseInt(auj.slice(0,4),10); an++){\n      for(let i=0;i<4;i++){\n        const d=an+fins[i];\n        if(d<dates[0] || d>auj) continue;\n        let det=0;\n        mv.forEach(function(a){ if(!a.date || a.date<=d) det+=a.qte; });\n        prel.forEach(function(x){ det+=x.qte; });\n        if(det>1e-6) prel.push({date:d, nom:s.nom, cle:s.cle, qte:-det*f, prix:null, frais:true});\n      }\n    }\n    prel.forEach(function(x){ APPORTS.push(x); QUANTITES[s.cle]=(QUANTITES[s.cle]||0)+x.qte; });\n    if(Math.abs(QUANTITES[s.cle]||0)<1e-6) QUANTITES[s.cle]=0;\n  });\n}\n\nasync function chargerApports(){'),
+('  const n=APPORTS.length;\n  if(!n){',
+ '  const reels=APPORTS.filter(function(a){ return !a.frais; });   // sans les frais calcules\n  const n=reels.length;\n  if(!n){'),
+('  APPORTS.slice(Math.max(0,n-6)).reverse()',
+ '  reels.slice(Math.max(0,n-6)).reverse()'),
 ],
 }
 
