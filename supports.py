@@ -16,6 +16,7 @@ Format lu (voir l en-tete de supports.txt pour la documentation complete) :
     actions   = 1.00              part investie en actions, entre 0 et 1
     geo       = monde 0.50 + euro 0.50
     taux      = 2026-01-01 1.70 + 2026-02-01 1.50    livrets : taux annuel en %, par date d effet
+    frais     = 0.1875            assurance vie (UC) : frais de gestion en % par trimestre
 
 Les lignes vides et celles commencant par # sont ignorees.
 """
@@ -87,7 +88,7 @@ def lire(chemin=FICHIER):
                     "nom": titre.group(1).strip(), "cle": "", "enveloppe": "",
                     "source": "", "url": "", "actions": 0.0,
                     "geo": {"monde": 0.0, "euro": 0.0, "em": 0.0},
-                    "taux": [],
+                    "taux": [], "frais": 0.0,
                 }
                 supports.append(courant)
                 continue
@@ -113,6 +114,8 @@ def lire(chemin=FICHIER):
                 courant["geo"] = _geo(valeur)
             elif champ == "taux":
                 courant["taux"] = _taux(valeur)
+            elif champ == "frais":
+                courant["frais"] = _nombre(valeur)
             else:
                 raise RuntimeError("%s ligne %d : champ inconnu '%s'" % (chemin, num, champ))
 
@@ -151,6 +154,40 @@ def fonds(supports):
 def fixes(supports):
     """Cles des supports a valeur fixe (livrets) : solde du journal + interets courus."""
     return [s["cle"] for s in supports if s["source"] == "fixe"]
+
+
+# ----------------------------------------------------------------------------
+#  FRAIS DE GESTION DES UNITES DE COMPTE (assurance vie)
+# ----------------------------------------------------------------------------
+#  L assureur preleve chaque trimestre un pourcentage des parts detenues, en
+#  diminuant leur nombre. On reconstitue ces prelevements au dernier jour de
+#  chaque trimestre echu : parts detenues ce jour-la (mouvements dates de ce jour
+#  inclus, prelevements precedents deduits) x taux. Meme calcul que index.html.
+FINS_TRIMESTRE = ("-03-31", "-06-30", "-09-30", "-12-31")
+
+
+def frais_trimestriels(taux_pct, mouvements, jusqua):
+    """mouvements : [(date AAAA-MM-JJ, quantite), ...] d un seul support.
+    Renvoie les prelevements [(date, quantite negative), ...] jusqu a jusqua inclus."""
+    if not taux_pct or not mouvements:
+        return []
+    f = taux_pct / 100.0
+    dates = sorted(d for d, _ in mouvements if d)
+    if not dates:
+        return []
+    out = []
+    for annee in range(int(dates[0][:4]), int(jusqua[:4]) + 1):
+        for fin in FINS_TRIMESTRE:
+            d = "%d%s" % (annee, fin)
+            if d < dates[0]:
+                continue
+            if d > jusqua:
+                return out
+            detenu = sum(q for dm, q in mouvements if not dm or dm <= d)
+            detenu += sum(q for _, q in out)
+            if detenu > 1e-6:
+                out.append((d, -detenu * f))
+    return out
 
 
 def par_intitule(supports):
