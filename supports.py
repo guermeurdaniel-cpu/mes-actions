@@ -160,33 +160,45 @@ def fixes(supports):
 #  FRAIS DE GESTION DES UNITES DE COMPTE (assurance vie)
 # ----------------------------------------------------------------------------
 #  L assureur preleve chaque trimestre un pourcentage des parts detenues, en
-#  diminuant leur nombre. On reconstitue ces prelevements au dernier jour de
-#  chaque trimestre echu : parts detenues ce jour-la (mouvements dates de ce jour
-#  inclus, prelevements precedents deduits) x taux. Meme calcul que index.html.
+#  diminuant leur nombre. On rejoue le journal du support dans l ordre des dates
+#  et, au dernier jour de chaque trimestre echu, on preleve parts detenues ce
+#  jour-la (mouvements dates de ce jour inclus) x taux.
+#  Vente totale : si une vente laisse un reliquat inferieur a 1 % de la position
+#  d avant la vente, c est un ecart entre frais calcules et frais reels ; il est
+#  solde par un mouvement virtuel. Meme calcul que ajouterFrais() dans index.html.
 FINS_TRIMESTRE = ("-03-31", "-06-30", "-09-30", "-12-31")
 
 
 def frais_trimestriels(taux_pct, mouvements, jusqua):
     """mouvements : [(date AAAA-MM-JJ, quantite), ...] d un seul support.
-    Renvoie les prelevements [(date, quantite negative), ...] jusqu a jusqua inclus."""
+    Renvoie les mouvements virtuels [(date, quantite), ...] jusqu a jusqua inclus :
+    prelevements de frais et soldes de reliquat apres une vente totale."""
     if not taux_pct or not mouvements:
         return []
     f = taux_pct / 100.0
     dates = sorted(d for d, _ in mouvements if d)
     if not dates:
         return []
-    out = []
+    detenu = sum(q for d, q in mouvements if not d)
+    jours = set(dates)
     for annee in range(int(dates[0][:4]), int(jusqua[:4]) + 1):
         for fin in FINS_TRIMESTRE:
             d = "%d%s" % (annee, fin)
-            if d < dates[0]:
-                continue
-            if d > jusqua:
-                return out
-            detenu = sum(q for dm, q in mouvements if not dm or dm <= d)
-            detenu += sum(q for _, q in out)
-            if detenu > 1e-6:
-                out.append((d, -detenu * f))
+            if dates[0] <= d <= jusqua:
+                jours.add(d)
+    out = []
+    for d in sorted(jours):
+        avant, vente = detenu, False
+        for dm, q in mouvements:
+            if dm == d:
+                detenu += q
+                vente = vente or q < 0
+        if vente and detenu != 0 and avant > 0 and abs(detenu) <= 0.01 * avant:
+            out.append((d, -detenu))
+            detenu = 0.0
+        if d[4:] in FINS_TRIMESTRE and detenu > 1e-6:
+            out.append((d, -detenu * f))
+            detenu -= detenu * f
     return out
 
 

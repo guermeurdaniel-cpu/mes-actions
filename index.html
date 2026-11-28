@@ -549,32 +549,45 @@ function parserApports(txt){
 }
 
 // Frais de gestion des unites de compte (champ frais de supports.txt, en % par
-// trimestre) : l assureur les preleve en diminuant le nombre de parts. On cree
-// un mouvement virtuel au dernier jour de chaque trimestre echu, egal aux parts
-// detenues ce jour-la x taux, sans prix : la quantite baisse, le PRU ne bouge
-// pas, et ce n est pas un retrait (investiA l ignore), donc c est une perte.
+// trimestre) : l assureur les preleve en diminuant le nombre de parts. On rejoue
+// le journal du support dans l ordre des dates et, au dernier jour de chaque
+// trimestre echu, on cree un mouvement virtuel egal aux parts detenues ce
+// jour-la x taux, sans prix : la quantite baisse, le PRU ne bouge pas, et ce
+// n est pas un retrait (investiA l ignore), donc c est une perte.
+// Vente totale : si une vente laisse un reliquat inferieur a 1 % de la position
+// d avant la vente, c est un ecart entre frais calcules et frais reels ; il est
+// solde par un mouvement virtuel, et la ligne vendue disparait bien de la page.
 // Meme calcul que supports.frais_trimestriels() cote Python.
 function ajouterFrais(){
   const auj=todayStr();
+  const fins=["-03-31","-06-30","-09-30","-12-31"];
   SUPPORTS.forEach(function(s){
     if(!s.frais) return;
     const f=s.frais/100;
     const mv=APPORTS.filter(function(a){ return a.cle===s.cle; });
     const dates=mv.map(function(a){ return a.date; }).filter(Boolean).sort();
     if(!dates.length) return;
-    const fins=["-03-31","-06-30","-09-30","-12-31"];
-    const prel=[];
+    let det=0;
+    mv.forEach(function(a){ if(!a.date) det+=a.qte; });
+    const jours={};
+    dates.forEach(function(d){ jours[d]=1; });
     for(let an=parseInt(dates[0].slice(0,4),10); an<=parseInt(auj.slice(0,4),10); an++){
-      for(let i=0;i<4;i++){
-        const d=an+fins[i];
-        if(d<dates[0] || d>auj) continue;
-        let det=0;
-        mv.forEach(function(a){ if(!a.date || a.date<=d) det+=a.qte; });
-        prel.forEach(function(x){ det+=x.qte; });
-        if(det>1e-6) prel.push({date:d, nom:s.nom, cle:s.cle, qte:-det*f, prix:null, frais:true});
-      }
+      fins.forEach(function(x){ const d=an+x; if(d>=dates[0] && d<=auj) jours[d]=1; });
     }
-    prel.forEach(function(x){ APPORTS.push(x); QUANTITES[s.cle]=(QUANTITES[s.cle]||0)+x.qte; });
+    const virt=[];
+    Object.keys(jours).sort().forEach(function(d){
+      const avant=det; let vente=false;
+      mv.forEach(function(a){ if(a.date===d){ det+=a.qte; if(a.qte<0) vente=true; } });
+      if(vente && det!==0 && avant>0 && Math.abs(det)<=0.01*avant){
+        virt.push({date:d, nom:s.nom, cle:s.cle, qte:-det, prix:null, frais:true});
+        det=0;
+      }
+      if(fins.indexOf(d.slice(4))>=0 && det>1e-6){
+        virt.push({date:d, nom:s.nom, cle:s.cle, qte:-det*f, prix:null, frais:true});
+        det-=det*f;
+      }
+    });
+    virt.forEach(function(x){ APPORTS.push(x); QUANTITES[s.cle]=(QUANTITES[s.cle]||0)+x.qte; });
     if(Math.abs(QUANTITES[s.cle]||0)<1e-6) QUANTITES[s.cle]=0;
   });
 }
