@@ -50,13 +50,26 @@ def nombre_fr(txt):
     return float(t.replace(",", "."))
 
 
+def _avec_frais(mvts, jusqua=None):
+    """Ajoute aux mouvements {cle: [(date, qte), ...]} les prelevements trimestriels
+    de frais des supports qui ont un champ frais dans supports.txt."""
+    jusqua = jusqua or datetime.date.today().isoformat()
+    for s in SUPPORTS:
+        if s.get("frais") and s["cle"] in mvts:
+            mvts[s["cle"]] = mvts[s["cle"]] + supports_mod.frais_trimestriels(
+                s["frais"], mvts[s["cle"]], jusqua)
+    return mvts
+
+
 def lire_apports(intitules, chemin="apports.csv"):
     """Somme les quantites du journal des apports, par cle de support.
 
     Format : date ; intitule ; quantite ; prix   (# = commentaire)
     Une quantite negative est une vente : elle diminue simplement la quantite.
+    Les frais trimestriels des unites de compte (champ frais de supports.txt)
+    sont deduits automatiquement.
     """
-    quantites = {}
+    mvts = {}
     with open(chemin, "r", encoding="utf-8-sig") as f:
         for num, brut in enumerate(f, start=1):
             ligne = brut.strip()
@@ -71,14 +84,18 @@ def lire_apports(intitules, chemin="apports.csv"):
                 raise RuntimeError("apports.csv ligne %d : intitule absent de supports.txt : '%s'" % (num, nom))
             if qte is None:
                 raise RuntimeError("apports.csv ligne %d : quantite absente" % num)
-            cle = intitules[nom]
-            quantites[cle] = quantites.get(cle, 0.0) + qte
+            mvts.setdefault(intitules[nom], []).append((champs[0].strip(), qte))
+    quantites = {}
+    for cle, l in _avec_frais(mvts).items():
+        q = sum(x for _, x in l)
+        quantites[cle] = 0.0 if abs(q) < 1e-6 else q
     return quantites
 
 
 def lire_mouvements(intitules, chemin="apports.csv"):
     """Mouvements dates par cle : {cle: [(date, quantite), ...]}. Sert aux livrets,
-    dont la valeur depend des dates de versement (regle des quinzaines)."""
+    dont la valeur depend des dates de versement (regle des quinzaines).
+    Frais trimestriels des unites de compte inclus."""
     mvts = {}
     with open(chemin, "r", encoding="utf-8-sig") as f:
         for brut in f:
@@ -90,7 +107,7 @@ def lire_mouvements(intitules, chemin="apports.csv"):
             qte = nombre_fr(champs[2]) if len(champs) > 2 else None
             if nom in intitules and qte is not None:
                 mvts.setdefault(intitules[nom], []).append((champs[0].strip(), qte))
-    return mvts
+    return _avec_frais(mvts)
 
 
 def prix_yahoo(sym):
