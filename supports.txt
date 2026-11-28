@@ -74,6 +74,16 @@
 #                    par quinzaine et comptes comme gain ; au 31 decembre,
 #                    saisir les interets credites dans apports.csv (prix 0).
 #
+#      frais         Unites de compte d assurance vie : frais de gestion en %
+#                    PAR TRIMESTRE, preleves par l assureur en diminuant le
+#                    nombre de parts, ex.  frais = 0.1875
+#                    Le prelevement est calcule tout seul au dernier jour de
+#                    chaque trimestre (31/03, 30/06, 30/09, 31/12) : nombre de
+#                    parts detenues ce jour-la x taux. Rien a saisir dans
+#                    apports.csv. Il baisse la quantite sans toucher au prix de
+#                    revient et ne compte pas comme un retrait : c est une
+#                    perte. Absent = pas de frais (fonds euros, PEA, PEG).
+#
 # -----------------------------------------------------------------------------
 #  L ORDRE DES BLOCS EST L ORDRE D AFFICHAGE a l interieur de chaque enveloppe.
 #  Deplacer un bloc reorganise le tableau de bord, sans rien casser.
@@ -180,6 +190,7 @@ cle       = FR0011408798
 enveloppe = AV
 source    = amundi-fr
 actions   = 0.00
+frais     = 0.1875
 # Support de liquidite, utilise pour les arbitrages.
 
 [Carmignac Securite]
@@ -188,6 +199,7 @@ enveloppe = AV
 source    = abcbourse
 url       = https://www.abcbourse.com/opcvm/carmignac-securite-aw-eur-acc_sFR0010149120
 actions   = 0.00
+frais     = 0.1875
 # Obligataire court terme.
 
 [ODDO Global Target 2029]
@@ -196,6 +208,7 @@ enveloppe = AV
 source    = boursier
 url       = https://www.boursier.com/opcvm/cours/oddo-bhf-global-target-ig-2029-cr-eur-FR001400HHQ5,FR.html
 actions   = 0.00
+frais     = 0.1875
 # Obligataire date, echeance 2029.
 
 [ETF Euro Corporate SRI]
@@ -203,6 +216,7 @@ cle       = CC4.PA
 enveloppe = AV
 source    = yahoo
 actions   = 0.00
+frais     = 0.1875
 # ETF obligataire d entreprises zone euro (LU1681039647). Cote, donc source yahoo,
 # bien qu il soit loge en assurance vie.
 
