@@ -89,14 +89,18 @@
 2026-06-16;ETF Euro Corporate SRI;14.3676;226.55
 2026-06-16;ODDO Global Target 2029;0.2715;110.29
 # Arbitrage du 21/11/2026 vers Amundi Euro Liquidity (regles.md §8).
+# Les frais de gestion trimestriels (champ frais de supports.txt) sont deduits
+# automatiquement au 30/06 et au 30/09 : les ventes portent donc sur les parts
+# restantes apres frais (parts du 16/06 x 0,998125 x 0,998125).
 # Ligne Amundi Euro Liquidity recalee le 28/11/2026 sur le releve BoursoVie :
-# 0,8948 parts au total, prix moyen 10973,81. Achat de l arbitrage deduit :
-# 0,8948 - 0,3054 = 0,5894 parts a 11019,62 (cout total 9819,36).
-# Les trois ventes restent ESTIMEES aux dernieres valeurs connues.
-2026-11-21;Carmignac Securite;-1.6917;1917.50
-2026-11-21;ETF Euro Corporate SRI;-14.3676;226.00
-2026-11-21;ODDO Global Target 2029;-0.2715;110.08
-2026-11-21;Amundi Euro Liquidity;0.5894;11019.62
+# 0,8948 parts au total, prix moyen 10973,81. Parts du 16/06 apres frais :
+# 0,304256, donc achat de l arbitrage 0,8948 - 0,304256 = 0,590544 parts a
+# 11019,53 (prix qui redonne le prix moyen de 10973,81).
+# Les prix des trois ventes restent ESTIMES aux dernieres valeurs connues.
+2026-11-21;Carmignac Securite;-1.685362;1917.50
+2026-11-21;ETF Euro Corporate SRI;-14.313772;226.00
+2026-11-21;ODDO Global Target 2029;-0.270483;110.08
+2026-11-21;Amundi Euro Liquidity;0.590544;11019.53
 
 # --- Livrets -------------------------------------------------------------
 # Soldes au 1er janvier 2026 : les interets 2026 sont calcules a partir de la.
