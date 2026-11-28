@@ -345,7 +345,7 @@ function parserSupports(txt){
     const titre=t.match(/^\[(.+)\]$/);           // nouveau bloc
     if(titre){
       courant={nom:titre[1].trim(), cle:"", enveloppe:"", source:"", url:"",
-               actions:0, geo:{monde:0,euro:0,em:0}, taux:[], ligne:i+1};
+               actions:0, geo:{monde:0,euro:0,em:0}, taux:[], frais:0, ligne:i+1};
       liste.push(courant);
       return;
     }
@@ -360,6 +360,7 @@ function parserSupports(txt){
     else if(champ==="actions")   courant.actions=nombreFr(val)||0;
     else if(champ==="geo")       courant.geo=lireGeo(val);
     else if(champ==="taux")      courant.taux=lireTaux(val, erreurs);
+    else if(champ==="frais")     courant.frais=nombreFr(val)||0;
     else erreurs.push("ligne "+(i+1)+" : champ inconnu \""+champ+"\"");
   });
   // Controles : mieux vaut un message clair qu un tableau de bord a zero
@@ -542,8 +543,40 @@ function parserApports(txt){
     }
   });
   for(const cle in achats){ if(achats[cle].qte>0) PRU[cle]=achats[cle].cout/achats[cle].qte; }
+  ajouterFrais();
   APPORTS.sort(function(a,b){ return a.date<b.date? -1 : (a.date>b.date? 1 : 0); });
   return {inconnus:inconnus, malformes:malformes};
+}
+
+// Frais de gestion des unites de compte (champ frais de supports.txt, en % par
+// trimestre) : l assureur les preleve en diminuant le nombre de parts. On cree
+// un mouvement virtuel au dernier jour de chaque trimestre echu, egal aux parts
+// detenues ce jour-la x taux, sans prix : la quantite baisse, le PRU ne bouge
+// pas, et ce n est pas un retrait (investiA l ignore), donc c est une perte.
+// Meme calcul que supports.frais_trimestriels() cote Python.
+function ajouterFrais(){
+  const auj=todayStr();
+  SUPPORTS.forEach(function(s){
+    if(!s.frais) return;
+    const f=s.frais/100;
+    const mv=APPORTS.filter(function(a){ return a.cle===s.cle; });
+    const dates=mv.map(function(a){ return a.date; }).filter(Boolean).sort();
+    if(!dates.length) return;
+    const fins=["-03-31","-06-30","-09-30","-12-31"];
+    const prel=[];
+    for(let an=parseInt(dates[0].slice(0,4),10); an<=parseInt(auj.slice(0,4),10); an++){
+      for(let i=0;i<4;i++){
+        const d=an+fins[i];
+        if(d<dates[0] || d>auj) continue;
+        let det=0;
+        mv.forEach(function(a){ if(!a.date || a.date<=d) det+=a.qte; });
+        prel.forEach(function(x){ det+=x.qte; });
+        if(det>1e-6) prel.push({date:d, nom:s.nom, cle:s.cle, qte:-det*f, prix:null, frais:true});
+      }
+    }
+    prel.forEach(function(x){ APPORTS.push(x); QUANTITES[s.cle]=(QUANTITES[s.cle]||0)+x.qte; });
+    if(Math.abs(QUANTITES[s.cle]||0)<1e-6) QUANTITES[s.cle]=0;
+  });
 }
 
 async function chargerApports(){
@@ -1153,10 +1186,11 @@ function insererLigne(texte, ligne, nom, date, enveloppe){
 function majSaisie(){
   initSaisie();
   const box=document.getElementById("fDerniers"); if(!box) return;
-  const n=APPORTS.length;
+  const reels=APPORTS.filter(function(a){ return !a.frais; });   // sans les frais calcules
+  const n=reels.length;
   if(!n){ box.innerHTML='<div class="vide">Journal vide ou pas encore charge.</div>'; return; }
   let h="";
-  APPORTS.slice(Math.max(0,n-6)).reverse().forEach(function(a){
+  reels.slice(Math.max(0,n-6)).reverse().forEach(function(a){
     const signe=a.qte<0? "Vente":"Achat";
     const mnt=(a.prix!==null)? eur(Math.abs(a.qte)*a.prix) : "montant inconnu";
     h+='<div class="att"><span class="txt">'+a.date+"  "+signe+"  "+a.nom+"  "+mnt+'</span></div>';
